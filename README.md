@@ -5,6 +5,8 @@ A behavioral leaderboard ranking real websites by how often a Gemini agent can c
 
 > QuackHacks 3 · University of Oregon · May 2026
 
+> 📋 **Team:** see [`docs/`](./docs/README.md) for the plan, current status, your per-role task list, and the future roadmap.
+
 ---
 
 ## The one-liner
