@@ -1,0 +1,209 @@
+{
+  "stripe": {
+    "site_id": "stripe",
+    "lh_total": 100,
+    "lh_accessibility_tree": 1,
+    "lh_layout_stability": 1,
+    "lh_llms_txt": 1,
+    "lh_webmcp": 0,
+    "run_at": "2026-05-30T21:39:03.557Z"
+  },
+  "vercel": {
+    "site_id": "vercel",
+    "lh_total": 67,
+    "lh_accessibility_tree": 0,
+    "lh_layout_stability": 1,
+    "lh_llms_txt": 1,
+    "lh_webmcp": 0,
+    "run_at": "2026-05-30T21:39:20.664Z"
+  },
+  "linear": {
+    "site_id": "linear",
+    "lh_total": 67,
+    "lh_accessibility_tree": 0,
+    "lh_layout_stability": 1,
+    "lh_llms_txt": 1,
+    "lh_webmcp": 0,
+    "run_at": "2026-05-30T21:39:34.918Z"
+  },
+  "cloudflare": {
+    "site_id": "cloudflare",
+    "lh_total": 100,
+    "lh_accessibility_tree": 1,
+    "lh_layout_stability": 1,
+    "lh_llms_txt": 1,
+    "lh_webmcp": 0,
+    "run_at": "2026-05-30T21:39:50.398Z"
+  },
+  "notion": {
+    "site_id": "notion",
+    "lh_total": 67,
+    "lh_accessibility_tree": 1,
+    "lh_layout_stability": 1,
+    "lh_llms_txt": 0,
+    "lh_webmcp": 0,
+    "run_at": "2026-05-30T21:40:10.867Z"
+  },
+  "github": {
+    "site_id": "github",
+    "lh_total": 100,
+    "lh_accessibility_tree": 1,
+    "lh_layout_stability": 1,
+    "lh_llms_txt": 1,
+    "lh_webmcp": 0,
+    "run_at": "2026-05-30T21:40:28.862Z"
+  },
+  "shopify": {
+    "site_id": "shopify",
+    "lh_total": 67,
+    "lh_accessibility_tree": 0,
+    "lh_layout_stability": 1,
+    "lh_llms_txt": 1,
+    "lh_webmcp": 0,
+    "run_at": "2026-05-30T21:40:50.312Z"
+  },
+  "dropbox": {
+    "site_id": "dropbox",
+    "lh_total": 33,
+    "lh_accessibility_tree": 0,
+    "lh_layout_stability": 1,
+    "lh_llms_txt": 0,
+    "lh_webmcp": 0,
+    "run_at": "2026-05-30T21:41:14.945Z"
+  },
+  "doordash": {
+    "site_id": "doordash",
+    "lh_total": 61,
+    "lh_accessibility_tree": 1,
+    "lh_layout_stability": 0,
+    "lh_llms_txt": 0,
+    "lh_webmcp": 0,
+    "run_at": "2026-05-30T21:41:39.727Z"
+  },
+  "spotify": {
+    "site_id": "spotify",
+    "lh_total": 67,
+    "lh_accessibility_tree": 1,
+    "lh_layout_stability": 1,
+    "lh_llms_txt": 0,
+    "lh_webmcp": 0,
+    "run_at": "2026-05-30T21:41:58.688Z"
+  },
+  "nytimes": {
+    "site_id": "nytimes",
+    "lh_total": 37,
+    "lh_accessibility_tree": 0,
+    "lh_layout_stability": 0,
+    "lh_llms_txt": 0,
+    "lh_webmcp": 0,
+    "run_at": "2026-05-30T21:42:23.563Z"
+  },
+  "reddit": {
+    "site_id": "reddit",
+    "lh_total": 100,
+    "lh_accessibility_tree": 1,
+    "lh_layout_stability": 1,
+    "lh_llms_txt": 0,
+    "lh_webmcp": 0,
+    "run_at": "2026-05-30T21:42:44.530Z"
+  },
+  "wikipedia": {
+    "site_id": "wikipedia",
+    "lh_total": 23,
+    "lh_accessibility_tree": 0,
+    "lh_layout_stability": 0,
+    "lh_llms_txt": 0,
+    "lh_webmcp": 0,
+    "run_at": "2026-05-30T21:42:59.707Z"
+  },
+  "amazon": {
+    "site_id": "amazon",
+    "lh_total": 50,
+    "lh_accessibility_tree": 0,
+    "lh_layout_stability": 1,
+    "lh_llms_txt": 0,
+    "lh_webmcp": 0,
+    "run_at": "2026-05-30T21:43:14.675Z"
+  },
+  "target": {
+    "site_id": "target",
+    "lh_total": 91,
+    "lh_accessibility_tree": 1,
+    "lh_layout_stability": 0,
+    "lh_llms_txt": 1,
+    "lh_webmcp": 0,
+    "run_at": "2026-05-30T21:43:34.110Z"
+  },
+  "southwest": {
+    "site_id": "southwest",
+    "lh_total": 73,
+    "lh_accessibility_tree": 1,
+    "lh_layout_stability": 0,
+    "lh_llms_txt": 0,
+    "lh_webmcp": 0,
+    "run_at": "2026-05-30T21:44:58.807Z"
+  },
+  "delta": {
+    "site_id": "delta",
+    "lh_total": 15,
+    "lh_accessibility_tree": 0,
+    "lh_layout_stability": 0,
+    "lh_llms_txt": 0,
+    "lh_webmcp": 0,
+    "run_at": "2026-05-30T21:45:24.950Z"
+  },
+  "apple": {
+    "site_id": "apple",
+    "lh_total": 50,
+    "lh_accessibility_tree": 0,
+    "lh_layout_stability": 1,
+    "lh_llms_txt": 0,
+    "lh_webmcp": 0,
+    "run_at": "2026-05-30T21:46:43.558Z"
+  },
+  "openai": {
+    "site_id": "openai",
+    "lh_total": 50,
+    "lh_accessibility_tree": 0,
+    "lh_layout_stability": 1,
+    "lh_llms_txt": 0,
+    "lh_webmcp": 0,
+    "run_at": "2026-05-30T21:47:15.655Z"
+  },
+  "uscis": {
+    "site_id": "uscis",
+    "lh_total": 39,
+    "lh_accessibility_tree": 0,
+    "lh_layout_stability": 0,
+    "lh_llms_txt": 0,
+    "lh_webmcp": 0,
+    "run_at": "2026-05-30T21:47:51.565Z"
+  },
+  "usps": {
+    "site_id": "usps",
+    "lh_total": 39,
+    "lh_accessibility_tree": 0,
+    "lh_layout_stability": 0,
+    "lh_llms_txt": 0,
+    "lh_webmcp": 0,
+    "run_at": "2026-05-30T21:48:25.625Z"
+  },
+  "ssa": {
+    "site_id": "ssa",
+    "lh_total": 100,
+    "lh_accessibility_tree": 1,
+    "lh_layout_stability": 1,
+    "lh_llms_txt": 0,
+    "lh_webmcp": 0,
+    "run_at": "2026-05-30T21:48:57.062Z"
+  },
+  "wix_help": {
+    "site_id": "wix_help",
+    "lh_total": 50,
+    "lh_accessibility_tree": 0,
+    "lh_layout_stability": 1,
+    "lh_llms_txt": 0,
+    "lh_webmcp": 0,
+    "run_at": "2026-05-30T21:49:18.119Z"
+  }
+}
