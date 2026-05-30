@@ -1,0 +1,21 @@
+# Next.js
+.next/
+out/
+
+# Dependencies
+node_modules/
+
+# Environment
+.env.local
+service-account.json
+
+# Lighthouse tmp files
+.lh-tmp.json
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+
+# Firebase
+.firebase/
