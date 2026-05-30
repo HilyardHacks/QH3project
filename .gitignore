@@ -22,3 +22,6 @@ __pycache__/
 
 # Firebase
 .firebase/
+
+# Claude Code (personal, per-user — never commit)
+CLAUDE.local.md
