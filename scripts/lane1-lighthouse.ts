@@ -13,7 +13,7 @@
  */
 
 import { execSync } from "child_process";
-import { writeFileSync, readFileSync } from "fs";
+import { readFileSync, unlinkSync } from "fs";
 import path from "path";
 import cohortRaw from "./cohort.json";
 import type { LighthouseResult } from "../lib/types";
@@ -31,6 +31,7 @@ interface CohortEntry {
   expected_lh: string;
   category: string;
   manual_pass: string;
+  task_hint?: string;
 }
 
 const cohort = cohortRaw as CohortEntry[];
@@ -40,11 +41,10 @@ const cohort = cohortRaw as CohortEntry[];
 // ---------------------------------------------------------------------------
 
 async function runLighthouse(url: string): Promise<LighthouseResult | null> {
-  const tmpFile = path.join(process.cwd(), ".lh-tmp.json");
+  const tmpFile = path.join(process.cwd(), `.lh-tmp-${process.pid}.json`);
 
   try {
-    // Lighthouse 12+ CLI: --only-categories=agentic-browsing (new in 13.3)
-    // Falls back to best-practices + accessibility if the category isn't found.
+    // Requires Lighthouse >= 13.3 — the Agentic Browsing category shipped May 2026.
     const cmd = [
       "npx lighthouse",
       `"${url}"`,
@@ -52,7 +52,7 @@ async function runLighthouse(url: string): Promise<LighthouseResult | null> {
       `--output-path="${tmpFile}"`,
       "--quiet",
       "--chrome-flags='--headless --no-sandbox --disable-gpu'",
-      "--only-categories=agentic-browsing,accessibility,best-practices",
+      "--only-categories=agentic-browsing",
     ].join(" ");
 
     console.log(`  Running Lighthouse on ${url}`);
@@ -60,35 +60,53 @@ async function runLighthouse(url: string): Promise<LighthouseResult | null> {
 
     const raw = JSON.parse(readFileSync(tmpFile, "utf-8"));
 
-    // Extract agentic-browsing category (or fall back to the available data)
+    // The Agentic Browsing category IS the lh_total. Do NOT fabricate a substitute
+    // score — a fabricated covariate would silently corrupt the headline correlation.
+    // Fail loudly so the run is recorded as FAILED rather than written with a fake number.
     const agenticCategory = raw.categories?.["agentic-browsing"];
-    const lh_total = agenticCategory
-      ? Math.round(agenticCategory.score * 100)
-      : Math.round(
-          ((raw.categories?.accessibility?.score ?? 0) +
-            (raw.categories?.["best-practices"]?.score ?? 0)) *
-            50
-        );
+    if (!agenticCategory || typeof agenticCategory.score !== "number") {
+      const available = Object.keys(raw.categories ?? {}).join(", ") || "(none)";
+      throw new Error(
+        `No "agentic-browsing" category in Lighthouse output. Available: [${available}]. ` +
+        `Confirm lighthouse >= 13.3 is installed and that the category id is correct.`
+      );
+    }
+    const lh_total = Math.round(agenticCategory.score * 100);
 
-    // Extract individual audit results
+    // Per-audit pass/fail. score 1 = pass, otherwise 0. Downstream (correlation, UI) assumes 0/1.
     const audits = raw.audits ?? {};
-
     const auditPass = (id: string): number => {
       const audit = audits[id];
       if (!audit) return 0;
-      // score of 1 = pass, 0 = fail, null = not applicable
       return audit.score === 1 ? 1 : 0;
     };
 
-    // Map to our schema — audit IDs may vary in the released Lighthouse version.
-    // These are the best guesses from the spec; adjust if the actual Lighthouse output differs.
+    // NOTE: these audit ids are best-guesses from the spec. Verify them against real
+    // Lighthouse 13.3 JSON once (npx lighthouse <url> --output=json, grep raw.audits keys)
+    // and correct here before the cohort run. The warning below fires if an id is absent,
+    // so a 0 from a typo'd id can't masquerade as a genuine audit failure unnoticed.
+    const auditIds = {
+      lh_accessibility_tree: "agentic-browsing-accessibility-tree",
+      lh_layout_stability: "agentic-browsing-layout-stability",
+      lh_llms_txt: "agentic-browsing-llms-txt",
+      lh_webmcp: "agentic-browsing-webmcp",
+    };
+    const missing = Object.values(auditIds).filter((id) => !(id in audits));
+    if (missing.length) {
+      const agenticAudits = Object.keys(audits).filter((k) => k.includes("agentic")).join(", ") || "(none)";
+      console.warn(
+        `  ⚠ Unknown audit ids: ${missing.join(", ")}. ` +
+        `Agentic audits actually present: ${agenticAudits}. Update auditIds in lane1-lighthouse.ts.`
+      );
+    }
+
     const result: LighthouseResult = {
       site_id: "", // filled in by caller
       lh_total,
-      lh_accessibility_tree: auditPass("agentic-browsing-accessibility-tree") || auditPass("accessibility"),
-      lh_layout_stability: auditPass("agentic-browsing-layout-stability") || auditPass("cumulative-layout-shift"),
-      lh_llms_txt: auditPass("agentic-browsing-llms-txt"),
-      lh_webmcp: auditPass("agentic-browsing-webmcp"),
+      lh_accessibility_tree: auditPass(auditIds.lh_accessibility_tree),
+      lh_layout_stability: auditPass(auditIds.lh_layout_stability),
+      lh_llms_txt: auditPass(auditIds.lh_llms_txt),
+      lh_webmcp: auditPass(auditIds.lh_webmcp),
       run_at: new Date().toISOString(),
     };
 
@@ -97,7 +115,7 @@ async function runLighthouse(url: string): Promise<LighthouseResult | null> {
     console.error(`  Lighthouse failed:`, (err as Error).message);
     return null;
   } finally {
-    try { execSync(`del "${tmpFile}" 2>nul`, { stdio: "pipe" }); } catch {}
+    try { unlinkSync(tmpFile); } catch {}
   }
 }
 

@@ -61,7 +61,7 @@ DEFAULT_TRIALS = 5
 TASK_TEMPLATE = (
     "Find the page describing the primary product or service offered by this website, "
     "and extract one specific factual claim about it. "
-    "Specifically: {task_hint}"
+    "{task_hint}"
 )
 
 # ---------------------------------------------------------------------------
@@ -97,8 +97,22 @@ def write_run(run: dict):
 # Gemini client
 # ---------------------------------------------------------------------------
 
-genai.configure(api_key=os.environ["GEMINI_API_KEY"])
-model = genai.GenerativeModel(GEMINI_MODEL)
+_model = None
+
+
+def get_model():
+    """Lazily configure Gemini so --help and Firestore-less runs don't crash at import
+    when GEMINI_API_KEY is unset; fail with a clear message only when a model is needed."""
+    global _model
+    if _model is None:
+        api_key = os.environ.get("GEMINI_API_KEY")
+        if not api_key:
+            raise SystemExit(
+                "GEMINI_API_KEY is not set. Add it to .env.local or export it before running Lane 2."
+            )
+        genai.configure(api_key=api_key)
+        _model = genai.GenerativeModel(GEMINI_MODEL)
+    return _model
 
 SYSTEM_PROMPT = """You are an agent browsing a website to complete a task.
 You will be given a screenshot of the current page, the page URL, title, and a text excerpt.
@@ -127,7 +141,7 @@ async def ask_gemini(task: str, screenshot_b64: str, accessible_text: str,
         {"mime_type": "image/png", "data": screenshot_b64},
     ]
     try:
-        response = model.generate_content(
+        response = get_model().generate_content(
             [SYSTEM_PROMPT, *user_content],
             generation_config={"temperature": 0, "max_output_tokens": 256},
         )
@@ -237,8 +251,11 @@ async def run_agent_on_site(
             except Exception as e:
                 print(f"      navigate failed: {e}")
 
+    # Exhausted the step budget without the agent ever calling "done": it couldn't find
+    # the path. That's navigation_stuck, NOT timeout (which is reserved for the wall-clock
+    # limit above) — keeping them distinct so the failure-mode breakdown is meaningful.
     return _build_run(site_id, trial_number, False, step_count,
-                      time.time() - start, "timeout", transcript)
+                      time.time() - start, "navigation_stuck", transcript)
 
 
 def _build_run(site_id, trial_number, success, step_count, elapsed, failure_mode, transcript):
@@ -284,7 +301,7 @@ async def run_scripted_extraction(
         f"Reply with ONLY the extracted answer as plain text (no JSON, no explanation)."
     )
     try:
-        response = model.generate_content(
+        response = get_model().generate_content(
             [extraction_prompt, {"mime_type": "image/png", "data": screenshot_b64},
              accessible_text[:3000]],
             generation_config={"temperature": 0, "max_output_tokens": 128},
@@ -334,7 +351,12 @@ async def main():
 
         for site in cohort:
             print(f"\n[{site['site_id']}] {site['name']}")
-            task = TASK_TEMPLATE.format(task_hint=site["answer_note"])
+            # IMPORTANT: never inject the answer value (answer_substring / answer_note) into the
+            # prompt — the model could then echo the answer without browsing, which would
+            # invalidate success_rate and the headline correlation. Use the neutral task_hint,
+            # which names WHAT to find, not its value.
+            hint = (site.get("task_hint") or "").strip()
+            task = TASK_TEMPLATE.format(task_hint=f"Specifically, find: {hint}." if hint else "")
 
             for trial in range(1, args.trials + 1):
                 print(f"  Trial {trial}/{args.trials}")

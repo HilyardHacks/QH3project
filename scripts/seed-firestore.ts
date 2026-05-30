@@ -27,7 +27,8 @@ async function main() {
     console.log(`  lighthouse/${lh.site_id}`);
   }
 
-  // Runs — store each as sites/{site_id}/runs/{trial_number}
+  // Runs — flat top-level collection, doc id `{site_id}_t{trial_number}`.
+  // (Must match lane2-agent.py write + queries.ts read — NOT a sites/{id}/runs subcollection.)
   for (const run of FAKE_RUNS) {
     const docId = `${run.site_id}_t${run.trial_number}`;
     await db.collection("runs").doc(docId).set(run);

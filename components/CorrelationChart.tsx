@@ -50,6 +50,16 @@ function CustomDot(props: {
 }
 
 export default function CorrelationChart({ points, slope, intercept, r }: Props) {
+  // Guard the empty/partial-data case (e.g. Lane 1 hasn't run yet) so Math.min/max over an
+  // empty array can't produce an Infinity axis domain and NaN stats.
+  if (points.length === 0) {
+    return (
+      <div className="flex items-center justify-center h-[420px] text-sm text-slate-400">
+        No correlation data yet — run Lane 1 (Lighthouse) and Lane 2 (agent) to populate the scatter.
+      </div>
+    );
+  }
+
   // Build trend line from min to max x
   const xs = points.map((p) => p.lh_total);
   const xMin = Math.max(0, Math.min(...xs) - 5);
@@ -105,7 +115,7 @@ export default function CorrelationChart({ points, slope, intercept, r }: Props)
           </YAxis>
           <Tooltip content={<CustomTooltip />} />
           {/* Trend line */}
-          <Scatter data={trendData} line={{ stroke: "#94a3b8", strokeDasharray: "4 4", strokeWidth: 1.5 }} shape={() => null} />
+          <Scatter data={trendData} line={{ stroke: "#94a3b8", strokeDasharray: "4 4", strokeWidth: 1.5 }} shape={() => <g />} />
           {/* Data points */}
           <Scatter data={scatterData} shape={<CustomDot />} />
         </ScatterChart>

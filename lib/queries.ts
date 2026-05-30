@@ -129,11 +129,17 @@ function computeEntry(
       ? runs.reduce((s, r) => s + r.step_count, 0) / runs.length
       : 0;
 
+  // Dominant FAILURE mode — exclude "success" so a mostly-successful site doesn't report
+  // top_failure_mode === "success". If there are no failures, report "success"; if there
+  // are no runs at all, report "error" (no data yet).
   const failureCounts = new Map<FailureMode, number>();
   runs.forEach((r) => {
+    if (r.failure_mode === "success") return;
     failureCounts.set(r.failure_mode, (failureCounts.get(r.failure_mode) ?? 0) + 1);
   });
-  const top_failure_mode = [...failureCounts.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? "error";
+  const topFailure = [...failureCounts.entries()].sort((a, b) => b[1] - a[1])[0]?.[0];
+  const top_failure_mode: FailureMode =
+    runs.length === 0 ? "error" : (topFailure ?? "success");
 
   return {
     site_id: site.site_id,
@@ -147,7 +153,7 @@ function computeEntry(
     success_rate,
     trial_count: runs.length,
     mean_steps: Math.round(mean_steps * 10) / 10,
-    top_failure_mode: top_failure_mode as FailureMode,
+    top_failure_mode,
     rank: 0,
   };
 }

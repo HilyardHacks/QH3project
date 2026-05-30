@@ -52,8 +52,13 @@ The app runs fully against the 3 pre-seeded fake rows. Lane 3 can build and poli
 
 **Setup:**
 ```bash
-npm install  # includes lighthouse + chrome-launcher
+npm install  # includes lighthouse@^13.3 (the Agentic Browsing category) + chrome-launcher
 ```
+
+> Lane 1 requires **Lighthouse ≥ 13.3** — the Agentic Browsing category does not exist before it.
+> Run `npx lighthouse <url> --output=json` once and confirm the real `agentic-browsing` category
+> id and audit ids, then correct `auditIds` in `scripts/lane1-lighthouse.ts`. The script now
+> **fails loudly** (no fabricated score) if the category is missing.
 
 **Run all cohort sites:**
 ```bash
@@ -110,32 +115,46 @@ Three pages, all server-rendered, all driven by the same `lib/queries.ts` interf
 | `/correlation` | Scatter chart (Lighthouse vs. success rate), Pearson r, sub-audit ranking |
 
 **Switching to real data:** in `.env.local`, set `USE_FAKE_DATA=false` and add `FIREBASE_SERVICE_ACCOUNT_JSON`.
+First run `npm run seed:sites` to load all cohort sites into the `sites` collection — Lanes 1 & 2
+write `lighthouse`/`runs` keyed by `site_id`, and the leaderboard only shows sites that have a
+matching `sites` row.
 
 ---
 
 ## Cohort management (`scripts/cohort.json`)
 
-30 sites, tagged with `expected_lh` (high/medium/low) and `manual_pass` (done/TBD).
+30 sites, tagged with `expected_lh` (high/medium/low) and `manual_pass` (done/TBD). Each row also
+has a `task_hint` (what the agent is told to find) and `answer_substring` (the pre-registered
+scoring key). **`task_hint` must never contain the `answer_substring` value** — the agent gets the
+hint, so leaking the value lets it answer without browsing and invalidates the result.
 
-**Before running Lanes 1 & 2:**
+**Before running Lanes 1 & 2 (only 5/30 are `done` — finish the rest):**
 1. For each `manual_pass: "TBD"` site, visit the URL manually
-2. Confirm the task is answerable and the `answer_substring` is correct
-3. Flag any sites that block you immediately (anti-bot, login wall) — swap them out if ≥5 are blocked
+2. Confirm the task is answerable, the `answer_substring` is the *exact* on-page value, and the
+   `task_hint` names the target without revealing it
+3. Tighten short/generic substrings (e.g. `$1`, `$4`, `free`, `62`) that would false-positive on
+   incidental page text; pre-register 2–3 accepted variants per site if formatting may vary
+4. Flag any sites that block you immediately (anti-bot, login wall) — swap them out if ≥5 are blocked
 
 ---
 
 ## Deploy
 
+This is a **server-rendered** Next.js app (pages are async server components that read
+Firestore via `firebase-admin`), so it cannot be deployed as a static site. Two options:
+
 ```bash
-# Build Next.js
-npm run build
+# Option A — Firebase Hosting with framework-aware SSR (Google-track story).
+# One-time: enable the web frameworks integration in the firebase CLI.
+firebase experiments:enable webframeworks
+firebase deploy --only hosting,firestore:rules   # builds + deploys the SSR backend
 
-# Deploy to Firebase Hosting (requires firebase CLI + project configured)
-npx firebase deploy --only hosting,firestore:rules
-
-# Or: use Cloud Run for a full SSR deployment
+# Option B — Cloud Run, full SSR from source.
 gcloud run deploy agentrank --source . --region us-central1
 ```
+
+> The old `public: ".next"` + `/index.html` rewrite would serve a blank page for an SSR app —
+> `firebase.json` now uses `frameworksBackend` instead. Test one deploy before demo day.
 
 ---
 

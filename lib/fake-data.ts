@@ -95,7 +95,7 @@ export const FAKE_LEADERBOARD: SiteLeaderboardEntry[] = [
     success_rate: 0.8,
     trial_count: 5,
     mean_steps: 4,
-    top_failure_mode: "success",
+    top_failure_mode: "wrong_extraction",
     rank: 1,
   },
   {

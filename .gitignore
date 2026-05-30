@@ -1,6 +1,8 @@
 # Next.js
 .next/
 out/
+next-env.d.ts
+*.tsbuildinfo
 
 # Dependencies
 node_modules/
@@ -10,6 +12,7 @@ node_modules/
 service-account.json
 
 # Lighthouse tmp files
+.lh-tmp-*.json
 .lh-tmp.json
 
 # Python
