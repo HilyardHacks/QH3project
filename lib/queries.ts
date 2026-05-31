@@ -14,7 +14,34 @@ import {
   FAKE_RUNS,
 } from "./fake-data";
 
-const USE_FAKE = process.env.USE_FAKE_DATA === "true" || !process.env.FIREBASE_SERVICE_ACCOUNT_JSON;
+// ---------------------------------------------------------------------------
+// Data-source gate (REAL vs FAKE)
+// ---------------------------------------------------------------------------
+// Foot-gun fixed: previously USE_FAKE = forceFake || !FIREBASE_SERVICE_ACCOUNT_JSON,
+// which silently served FAKE data even when GOOGLE_APPLICATION_CREDENTIALS pointed
+// at a real service account. Now: REAL data is used when EITHER credential mechanism
+// is present, UNLESS USE_FAKE_DATA === "true" forces fake.
+const FORCE_FAKE = process.env.USE_FAKE_DATA === "true";
+const HAS_SA_JSON = !!process.env.FIREBASE_SERVICE_ACCOUNT_JSON;
+const HAS_ADC = !!process.env.GOOGLE_APPLICATION_CREDENTIALS;
+const HAS_CREDENTIALS = HAS_SA_JSON || HAS_ADC;
+const USE_FAKE = FORCE_FAKE || !HAS_CREDENTIALS;
+
+// Single, explicit server-side log so it's never a mystery which data backs a render.
+function describeDataMode(): string {
+  if (FORCE_FAKE) return "FAKE (USE_FAKE_DATA=true forces fake)";
+  if (!HAS_CREDENTIALS) {
+    return "FAKE (no FIREBASE_SERVICE_ACCOUNT_JSON or GOOGLE_APPLICATION_CREDENTIALS present)";
+  }
+  const cred = HAS_SA_JSON ? "FIREBASE_SERVICE_ACCOUNT_JSON" : "GOOGLE_APPLICATION_CREDENTIALS";
+  return `REAL (credential: ${cred})`;
+}
+
+// Log once per server process (module load), not per request.
+if (typeof window === "undefined") {
+  // eslint-disable-next-line no-console
+  console.log(`[AgentRank] data mode: ${describeDataMode()}`);
+}
 
 // ---------------------------------------------------------------------------
 // Leaderboard
@@ -199,4 +226,115 @@ export function linearRegression(points: { x: number; y: number }[]): { slope: n
   const slope = denom === 0 ? 0 : num / denom;
   const intercept = meanY - slope * meanX;
   return { slope, intercept };
+}
+
+// ---------------------------------------------------------------------------
+// Number of joined points (sites with a non-null Lighthouse total).
+// This is the cohort n that backs every correlation statistic on /correlation.
+// ---------------------------------------------------------------------------
+export function joinedN(points: { x: number; y: number }[]): number {
+  return points.length;
+}
+
+// ---------------------------------------------------------------------------
+// Spearman rank correlation (rho)
+// ---------------------------------------------------------------------------
+// Rank-transform BOTH axes (average-rank tie handling), then run Pearson on the
+// ranks. Perfectly-monotone data must give rho = 1 (or -1). This is robust to
+// outliers and non-linearity, which matters with our small site cohort.
+
+// Average-rank transform: ties share the mean of the ranks they would occupy.
+function averageRanks(values: number[]): number[] {
+  const n = values.length;
+  const indexed = values.map((v, i) => ({ v, i }));
+  indexed.sort((a, b) => a.v - b.v);
+
+  const ranks = new Array<number>(n);
+  let i = 0;
+  while (i < n) {
+    let j = i;
+    // Extend over the tie group (equal values).
+    while (j + 1 < n && indexed[j + 1].v === indexed[i].v) j++;
+    // Ranks are 1-based; average rank of the tie group [i..j].
+    const avgRank = (i + j) / 2 + 1;
+    for (let k = i; k <= j; k++) ranks[indexed[k].i] = avgRank;
+    i = j + 1;
+  }
+  return ranks;
+}
+
+export function spearmanRho(points: { x: number; y: number }[]): number {
+  const n = points.length;
+  if (n < 2) return 0;
+
+  const xRanks = averageRanks(points.map((p) => p.x));
+  const yRanks = averageRanks(points.map((p) => p.y));
+
+  // Pearson on the ranks. Reuse pearsonR to keep one definition of correlation.
+  return pearsonR(xRanks.map((rx, i) => ({ x: rx, y: yRanks[i] })));
+}
+
+// ---------------------------------------------------------------------------
+// Deterministic bootstrap 95% CI for a correlation coefficient
+// ---------------------------------------------------------------------------
+// We need a CI that is IDENTICAL across renders (server re-renders, refreshes,
+// SSR vs client) so the published number never drifts. A seeded PRNG (mulberry32
+// with a FIXED seed) makes the resampling reproducible. ~2000 resamples; for each,
+// draw n points with replacement and recompute the statistic, then take the
+// 2.5th / 97.5th percentiles of the resampled distribution.
+
+const BOOTSTRAP_SEED = 0x9e3779b9; // fixed constant — do NOT change (keeps CI stable)
+const BOOTSTRAP_RESAMPLES = 2000;
+
+// mulberry32: tiny, fast, deterministic 32-bit PRNG. Returns a function yielding
+// floats in [0, 1).
+function mulberry32(seed: number): () => number {
+  let a = seed >>> 0;
+  return function () {
+    a |= 0;
+    a = (a + 0x6d2b79f5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+export interface CorrelationCI {
+  lo: number;
+  hi: number;
+}
+
+/**
+ * Deterministic bootstrap 95% CI for a correlation statistic.
+ * @param points  the joined (x, y) sample
+ * @param statFn  the statistic to bootstrap (defaults to Spearman rho)
+ */
+export function bootstrapCI(
+  points: { x: number; y: number }[],
+  statFn: (pts: { x: number; y: number }[]) => number = spearmanRho
+): CorrelationCI {
+  const n = points.length;
+  if (n < 2) {
+    const s = statFn(points);
+    return { lo: s, hi: s };
+  }
+
+  const rand = mulberry32(BOOTSTRAP_SEED);
+  const stats: number[] = new Array(BOOTSTRAP_RESAMPLES);
+
+  for (let b = 0; b < BOOTSTRAP_RESAMPLES; b++) {
+    const sample: { x: number; y: number }[] = new Array(n);
+    for (let i = 0; i < n; i++) {
+      const idx = Math.floor(rand() * n);
+      sample[i] = points[idx];
+    }
+    stats[b] = statFn(sample);
+  }
+
+  stats.sort((a, b) => a - b);
+
+  // 2.5th and 97.5th percentiles via nearest-rank on the sorted resamples.
+  const loIdx = Math.floor(0.025 * (BOOTSTRAP_RESAMPLES - 1));
+  const hiIdx = Math.ceil(0.975 * (BOOTSTRAP_RESAMPLES - 1));
+  return { lo: stats[loIdx], hi: stats[hiIdx] };
 }

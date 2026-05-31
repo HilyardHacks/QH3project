@@ -29,7 +29,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         </header>
         <main className="max-w-6xl mx-auto px-4 py-8">{children}</main>
         <footer className="border-t border-slate-200 bg-white mt-16">
-          <div className="max-w-6xl mx-auto px-4 h-12 flex items-center justify-between text-xs text-slate-400">
+          <div className="max-w-6xl mx-auto px-4 py-3 flex flex-col gap-1 text-xs text-slate-400 sm:flex-row sm:items-center sm:justify-between">
             <span>AgentRank · QuackHacks 3 · University of Oregon · May 2026</span>
             <span>
               Static scores via{" "}
@@ -38,6 +38,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               </a>{" "}
               · Behavioral results via Gemini
             </span>
+          </div>
+          <div className="max-w-6xl mx-auto px-4 pb-3 text-[11px] text-slate-400">
+            Methodology: pre-registered case-insensitive substring scoring · correlation reported as
+            Pearson r and Spearman ρ with a deterministic seeded-bootstrap 95% CI · cohort n = joined sites.
           </div>
         </footer>
       </body>

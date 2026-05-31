@@ -2,7 +2,16 @@ import Link from "next/link";
 import { getLeaderboard } from "@/lib/queries";
 import { SiteLeaderboardEntry } from "@/lib/types";
 
-function SuccessBar({ rate }: { rate: number }) {
+function SuccessBar({ rate, trialCount }: { rate: number; trialCount: number }) {
+  // Sites with no runs yet shouldn't render a misleading 0% — show "pending".
+  if (trialCount === 0) {
+    return (
+      <div className="flex items-center gap-2">
+        <div className="w-24 bg-slate-100 rounded-full h-2 overflow-hidden" />
+        <span className="text-sm font-medium text-slate-400">pending</span>
+      </div>
+    );
+  }
   const pct = Math.round(rate * 100);
   const color =
     pct >= 70 ? "bg-emerald-500" : pct >= 40 ? "bg-amber-400" : "bg-red-400";
@@ -92,20 +101,29 @@ export default async function LeaderboardPage() {
         </p>
       </div>
 
-      {/* Stats strip */}
+      {/* Stats strip — guarded for partial / empty data */}
+      {(() => {
+        const totalRuns = entries.reduce((s, e) => s + e.trial_count, 0);
+        // Only average over sites that actually have runs, so sites still pending
+        // (0 trials) don't drag a misleading 0% into the headline average.
+        const sitesWithRuns = entries.filter((e) => e.trial_count > 0);
+        const avgSuccess =
+          sitesWithRuns.length === 0
+            ? null
+            : Math.round(
+                (sitesWithRuns.reduce((s, e) => s + e.success_rate, 0) / sitesWithRuns.length) * 100
+              );
+        return (
       <div className="grid grid-cols-3 gap-4 mb-8">
         {[
           { label: "Sites tested", value: entries.length },
           {
             label: "Avg success rate",
-            value:
-              Math.round(
-                (entries.reduce((s, e) => s + e.success_rate, 0) / entries.length) * 100
-              ) + "%",
+            value: avgSuccess === null ? "—" : avgSuccess + "%",
           },
           {
             label: "Total agent runs",
-            value: entries.reduce((s, e) => s + e.trial_count, 0),
+            value: totalRuns,
           },
         ].map(({ label, value }) => (
           <div key={label} className="bg-white rounded-xl border border-slate-200 px-5 py-4">
@@ -114,6 +132,8 @@ export default async function LeaderboardPage() {
           </div>
         ))}
       </div>
+        );
+      })()}
 
       {/* Table */}
       <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
@@ -140,8 +160,10 @@ export default async function LeaderboardPage() {
                   <div className="text-xs text-slate-400 truncate max-w-xs">{entry.url}</div>
                 </td>
                 <td className="px-4 py-3">
-                  <SuccessBar rate={entry.success_rate} />
-                  <div className="text-xs text-slate-400 mt-0.5">{entry.trial_count} trials</div>
+                  <SuccessBar rate={entry.success_rate} trialCount={entry.trial_count} />
+                  <div className="text-xs text-slate-400 mt-0.5">
+                    {entry.trial_count === 0 ? "no runs yet" : `${entry.trial_count} trials`}
+                  </div>
                 </td>
                 <td className="px-4 py-3">
                   <FailureBadge mode={entry.top_failure_mode} />

@@ -18,6 +18,9 @@ interface Props {
   slope: number;
   intercept: number;
   r: number;
+  rho: number;
+  ci: { lo: number; hi: number };
+  n: number;
 }
 
 function CustomTooltip({ active, payload }: { active?: boolean; payload?: { payload: CorrelationPoint }[] }) {
@@ -49,7 +52,7 @@ function CustomDot(props: {
   );
 }
 
-export default function CorrelationChart({ points, slope, intercept, r }: Props) {
+export default function CorrelationChart({ points, slope, intercept, r, rho, ci, n }: Props) {
   // Guard the empty/partial-data case (e.g. Lane 1 hasn't run yet) so Math.min/max over an
   // empty array can't produce an Infinity axis domain and NaN stats.
   if (points.length === 0) {
@@ -78,10 +81,24 @@ export default function CorrelationChart({ points, slope, intercept, r }: Props)
 
   return (
     <div>
-      <div className="flex items-center gap-4 mb-4">
+      <div className="flex flex-wrap items-center gap-4 mb-4">
         <div className="bg-sky-50 border border-sky-200 rounded-lg px-4 py-3 text-center">
           <p className="text-2xl font-bold text-sky-700 tabular-nums">{r.toFixed(2)}</p>
           <p className="text-xs text-sky-600 mt-0.5">Pearson r</p>
+        </div>
+        <div className="bg-indigo-50 border border-indigo-200 rounded-lg px-4 py-3 text-center">
+          <p className="text-2xl font-bold text-indigo-700 tabular-nums">{rho.toFixed(2)}</p>
+          <p className="text-xs text-indigo-600 mt-0.5">Spearman ρ</p>
+        </div>
+        <div className="bg-slate-50 border border-slate-200 rounded-lg px-4 py-3 text-center">
+          <p className="text-base font-semibold text-slate-700 tabular-nums">
+            [{ci.lo.toFixed(2)}, {ci.hi.toFixed(2)}]
+          </p>
+          <p className="text-xs text-slate-500 mt-0.5">95% CI (bootstrap)</p>
+        </div>
+        <div className="bg-slate-50 border border-slate-200 rounded-lg px-4 py-3 text-center">
+          <p className="text-2xl font-bold text-slate-700 tabular-nums">n={n}</p>
+          <p className="text-xs text-slate-500 mt-0.5">joined sites</p>
         </div>
         <p className="text-sm text-slate-500 max-w-sm">
           {Math.abs(r) >= 0.7
