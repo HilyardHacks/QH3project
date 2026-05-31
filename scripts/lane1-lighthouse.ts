@@ -61,7 +61,7 @@ async function runLighthouse(url: string): Promise<LighthouseResult | null> {
       "--chrome-flags='--headless --no-sandbox --disable-gpu'",
     ].join(" ");
 
-    execSync(cmd, { stdio: "pipe", timeout: 120_000 });
+    execSync(cmd, { stdio: "pipe", timeout: 180_000 });
 
     const raw = JSON.parse(readFileSync(tmpFile, "utf-8"));
 
