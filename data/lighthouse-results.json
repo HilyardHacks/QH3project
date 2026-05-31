@@ -1,0 +1,191 @@
+[
+  {
+    "site_id": "stripe",
+    "lh_total": 100,
+    "lh_accessibility_tree": 1,
+    "lh_layout_stability": 1,
+    "lh_llms_txt": 1,
+    "lh_webmcp": 0,
+    "run_at": "2026-05-31T09:58:38.985Z"
+  },
+  {
+    "site_id": "shopify",
+    "lh_total": 67,
+    "lh_accessibility_tree": 0,
+    "lh_layout_stability": 1,
+    "lh_llms_txt": 1,
+    "lh_webmcp": 0,
+    "run_at": "2026-05-31T09:59:04.400Z"
+  },
+  {
+    "site_id": "github",
+    "lh_total": 100,
+    "lh_accessibility_tree": 1,
+    "lh_layout_stability": 1,
+    "lh_llms_txt": 1,
+    "lh_webmcp": 0,
+    "run_at": "2026-05-31T09:59:31.851Z"
+  },
+  {
+    "site_id": "twilio",
+    "lh_total": 29,
+    "lh_accessibility_tree": 0,
+    "lh_layout_stability": 0,
+    "lh_llms_txt": 0,
+    "lh_webmcp": 0,
+    "run_at": "2026-05-31T10:00:42.769Z"
+  },
+  {
+    "site_id": "notion",
+    "lh_total": 67,
+    "lh_accessibility_tree": 1,
+    "lh_layout_stability": 1,
+    "lh_llms_txt": 0,
+    "lh_webmcp": 0,
+    "run_at": "2026-05-31T10:01:08.636Z"
+  },
+  {
+    "site_id": "cloudflare",
+    "lh_total": 100,
+    "lh_accessibility_tree": 1,
+    "lh_layout_stability": 1,
+    "lh_llms_txt": 1,
+    "lh_webmcp": 0,
+    "run_at": "2026-05-31T10:01:42.624Z"
+  },
+  {
+    "site_id": "spotify",
+    "lh_total": 67,
+    "lh_accessibility_tree": 1,
+    "lh_layout_stability": 1,
+    "lh_llms_txt": 0,
+    "lh_webmcp": 0,
+    "run_at": "2026-05-31T10:04:15.648Z"
+  },
+  {
+    "site_id": "costco",
+    "lh_total": 100,
+    "lh_accessibility_tree": 1,
+    "lh_layout_stability": 1,
+    "lh_llms_txt": 0,
+    "lh_webmcp": 0,
+    "run_at": "2026-05-31T10:04:34.959Z"
+  },
+  {
+    "site_id": "ca_dmv",
+    "lh_total": 46,
+    "lh_accessibility_tree": 1,
+    "lh_layout_stability": 0,
+    "lh_llms_txt": 0,
+    "lh_webmcp": 0,
+    "run_at": "2026-05-31T10:04:54.120Z"
+  },
+  {
+    "site_id": "tx_dmv",
+    "lh_total": 100,
+    "lh_accessibility_tree": 1,
+    "lh_layout_stability": 1,
+    "lh_llms_txt": 0,
+    "lh_webmcp": 0,
+    "run_at": "2026-05-31T10:05:12.750Z"
+  },
+  {
+    "site_id": "usps",
+    "lh_total": 50,
+    "lh_accessibility_tree": 0,
+    "lh_layout_stability": 1,
+    "lh_llms_txt": 0,
+    "lh_webmcp": 0,
+    "run_at": "2026-05-31T10:05:31.299Z"
+  },
+  {
+    "site_id": "irs",
+    "lh_total": 39,
+    "lh_accessibility_tree": 0,
+    "lh_layout_stability": 0,
+    "lh_llms_txt": 0,
+    "lh_webmcp": 0,
+    "run_at": "2026-05-31T10:05:48.901Z"
+  },
+  {
+    "site_id": "ssa",
+    "lh_total": 100,
+    "lh_accessibility_tree": 1,
+    "lh_layout_stability": 1,
+    "lh_llms_txt": 0,
+    "lh_webmcp": 0,
+    "run_at": "2026-05-31T10:06:06.714Z"
+  },
+  {
+    "site_id": "trimet",
+    "lh_total": 50,
+    "lh_accessibility_tree": 0,
+    "lh_layout_stability": 1,
+    "lh_llms_txt": 0,
+    "lh_webmcp": 0,
+    "run_at": "2026-05-31T10:06:27.866Z"
+  },
+  {
+    "site_id": "portland",
+    "lh_total": 69,
+    "lh_accessibility_tree": 1,
+    "lh_layout_stability": 0,
+    "lh_llms_txt": 0,
+    "lh_webmcp": 0,
+    "run_at": "2026-05-31T10:06:45.050Z"
+  },
+  {
+    "site_id": "oregon_state",
+    "lh_total": 49,
+    "lh_accessibility_tree": 0,
+    "lh_layout_stability": 0,
+    "lh_llms_txt": 0,
+    "lh_webmcp": 0,
+    "run_at": "2026-05-31T10:07:06.242Z"
+  },
+  {
+    "site_id": "voodoo",
+    "lh_total": 50,
+    "lh_accessibility_tree": 0,
+    "lh_layout_stability": 1,
+    "lh_llms_txt": 0,
+    "lh_webmcp": 0,
+    "run_at": "2026-05-31T10:07:34.822Z"
+  },
+  {
+    "site_id": "innout",
+    "lh_total": 100,
+    "lh_accessibility_tree": 1,
+    "lh_layout_stability": 1,
+    "lh_llms_txt": 0,
+    "lh_webmcp": 0,
+    "run_at": "2026-05-31T10:07:57.936Z"
+  },
+  {
+    "site_id": "bear",
+    "lh_total": 12,
+    "lh_accessibility_tree": 0,
+    "lh_layout_stability": 0,
+    "lh_llms_txt": 0,
+    "lh_webmcp": 0,
+    "run_at": "2026-05-31T10:08:20.782Z"
+  },
+  {
+    "site_id": "apple",
+    "lh_total": 50,
+    "lh_accessibility_tree": 0,
+    "lh_layout_stability": 1,
+    "lh_llms_txt": 0,
+    "lh_webmcp": 0,
+    "run_at": "2026-05-31T10:08:46.641Z"
+  },
+  {
+    "site_id": "craigslist",
+    "lh_total": 100,
+    "lh_accessibility_tree": 1,
+    "lh_layout_stability": 1,
+    "lh_llms_txt": 0,
+    "lh_webmcp": 0,
+    "run_at": "2026-05-31T10:09:04.384Z"
+  }
+]
