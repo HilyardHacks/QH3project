@@ -23,8 +23,12 @@ __pycache__/
 # Lane 2 local dry-run output (runs go to Firestore, not git)
 lane2-runs*.jsonl
 
+# Lane 1 run logs (the results JSON is kept; the verbose log is not)
+data/*.log
+
 # Firebase
 .firebase/
 
 # Claude Code (personal, per-user — never commit)
 CLAUDE.local.md
+.claude/settings.local.json
