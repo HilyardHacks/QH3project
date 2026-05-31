@@ -34,6 +34,8 @@ import time
 from datetime import datetime, timezone
 from pathlib import Path
 
+from scorer import score_answer  # pure stdlib; safe before the heavy imports below
+
 # Windows consoles default to cp1252, which can't encode the ✓/—/→ glyphs we print and would
 # crash the run mid-cohort (e.g. right after the first Firestore write). Force UTF-8 output.
 for _stream in (sys.stdout, sys.stderr):
@@ -338,7 +340,7 @@ async def run_agent_on_site(
             if answer == "BLOCKED":
                 return _build_run(site_id, trial_number, False, step_count,
                                   time.time() - start, "blocked", transcript)
-            success = answer_substring.lower() in answer.lower()
+            success = score_answer(answer, answer_substring)
             mode = "success" if success else "wrong_extraction"
             return _build_run(site_id, trial_number, success, step_count,
                               time.time() - start, mode, transcript)
@@ -438,7 +440,7 @@ async def run_scripted_extraction(
         return _build_run(site_id, trial_number, False, 1,
                           time.time() - start, "error", [{"step": 1, "error": str(e)}])
 
-    success = answer_substring.lower() in answer.lower()
+    success = score_answer(answer, answer_substring)
     mode = "success" if success else "wrong_extraction"
     transcript = [{"step": 1, "url": page.url, "action": {"action": "done", "answer": answer}}]
     return _build_run(site_id, trial_number, success, 1,
@@ -491,6 +493,15 @@ async def main():
         try:
             for site in cohort:
                 print(f"\n[{site['site_id']}] {site['name']}")
+                # SKIP-GUARD: a cohort row is runnable only if it has a real URL. Placeholder
+                # rows (the 6 "[confirm ... product page URL]" markers) carry runnable=false and
+                # a literal "[confirm..." url — running them would just goto a bogus URL and burn
+                # trials/Gemini calls. Skip them cleanly. Default runnable=True so older cohorts
+                # (no 'runnable' field) still run unchanged.
+                url = (site.get("url") or "")
+                if site.get("runnable", True) is False or not url or url.startswith("[confirm"):
+                    print(f"  skipped (needs URL) — runnable={site.get('runnable', True)} url={url!r}")
+                    continue
                 # IMPORTANT: never inject the answer value (answer_substring / answer_note) into the
                 # prompt — the model could then echo the answer without browsing, which would
                 # invalidate success_rate and the headline correlation. Use the neutral task_hint,
