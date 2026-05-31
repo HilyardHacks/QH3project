@@ -15,6 +15,9 @@ Usage:
     # Decision-gate fallback: scripted nav + Gemini extraction only
     python scripts/lane2-agent.py --scripted-only --sites irs_gov
 
+    # Run without Firebase: write runs to a local JSONL file instead of Firestore
+    python scripts/lane2-agent.py --sites stripe vercel --trials 1 --dry-run
+
 Requirements:
     pip install -r scripts/requirements.txt
     Set GEMINI_API_KEY in .env.local (or export it)
@@ -23,7 +26,6 @@ Requirements:
 
 import argparse
 import asyncio
-import base64
 import json
 import os
 import re
@@ -31,6 +33,14 @@ import sys
 import time
 from datetime import datetime, timezone
 from pathlib import Path
+
+# Windows consoles default to cp1252, which can't encode the ✓/—/→ glyphs we print and would
+# crash the run mid-cohort (e.g. right after the first Firestore write). Force UTF-8 output.
+for _stream in (sys.stdout, sys.stderr):
+    try:
+        _stream.reconfigure(encoding="utf-8")
+    except Exception:
+        pass
 
 # Load .env.local if present (simple key=value parser, no library needed)
 def load_env(path=".env.local"):
@@ -52,6 +62,16 @@ from firebase_admin import credentials, firestore
 # ---------------------------------------------------------------------------
 # Config
 # ---------------------------------------------------------------------------
+#
+# *** FROZEN HARNESS *** — passed the 5-site pre-scale gate on 2026-05-30.
+# Do NOT edit any of the following during the cohort run; changing them mid-run
+# silently changes the measurement (model / prompt / limits / viewport / timeouts):
+#   GEMINI_MODEL, SYSTEM_PROMPT, TASK_TEMPLATE, MAX_STEPS, TIMEOUT_SECONDS,
+#   the generation_config (temperature=0, max_output_tokens=256, JSON mode),
+#   the 1280x800 viewport + chromium launch args, the per-action Playwright
+#   timeouts (goto 30s / navigate 20s / click+type 5s / load 10s), and the
+#   3-identical-actions loop-breaker. Pure bug fixes that don't change what the
+#   agent sees or does are fine; anything behavioral is not.
 
 GEMINI_MODEL = "gemini-2.0-flash"      # fast, cheap, multimodal
 MAX_STEPS = 15
@@ -87,9 +107,17 @@ def get_db():
     return _db
 
 
-def write_run(run: dict):
-    db = get_db()
+def write_run(run: dict, dry_run: bool = False, out_path: str = "lane2-runs.jsonl"):
     doc_id = f"{run['site_id']}_t{run['trial_number']}"
+    if dry_run:
+        # Local-JSON sink: write the run document VERBATIM — byte-for-byte the same dict
+        # we would hand Firestore .set() — one JSON object per line. The deterministic doc
+        # id is derivable from site_id + trial_number at read time, so the schema stays clean.
+        with open(out_path, "a", encoding="utf-8") as f:
+            f.write(json.dumps(run) + "\n")
+        print(f"    [dry-run] runs/{doc_id}  success={run['success']}  steps={run['step_count']}  -> {out_path}")
+        return
+    db = get_db()
     db.collection("runs").document(doc_id).set(run)
     print(f"    ✓ Wrote runs/{doc_id}  success={run['success']}  steps={run['step_count']}")
 
@@ -134,24 +162,67 @@ Rules:
 - Keep "selector" short and likely to be unique on the page.
 """
 
-async def ask_gemini(task: str, screenshot_b64: str, accessible_text: str,
+
+def _response_reason(response) -> str:
+    """Best-effort 'why was the body empty' for diagnostics (finish_reason / prompt block)."""
+    bits = []
+    try:
+        fr = response.candidates[0].finish_reason
+        bits.append(f"finish_reason={getattr(fr, 'name', fr)}")
+    except Exception:
+        pass
+    try:
+        br = response.prompt_feedback.block_reason
+        if br:
+            bits.append(f"block_reason={getattr(br, 'name', br)}")
+    except Exception:
+        pass
+    return ", ".join(bits) or "no candidates / unknown"
+
+
+async def ask_gemini(task: str, screenshot_bytes: bytes, accessible_text: str,
                      current_url: str, title: str) -> dict:
     user_content = [
         f"TASK: {task}\n\nCurrent URL: {current_url}\nPage title: {title}\n\nPage text excerpt:\n{accessible_text[:2000]}",
-        {"mime_type": "image/png", "data": screenshot_b64},
+        # google-generativeai expects RAW image bytes here and base64-encodes them for the
+        # REST payload itself. Passing a base64 *string* puts a str into a proto bytes field
+        # -> TypeError/garbage, which the except below would otherwise mask as wrong_extraction.
+        {"mime_type": "image/png", "data": screenshot_bytes},
     ]
-    try:
-        response = get_model().generate_content(
-            [SYSTEM_PROMPT, *user_content],
-            generation_config={"temperature": 0, "max_output_tokens": 256},
-        )
-        text = response.text.strip()
-        # Strip markdown code fences if Gemini wraps in them
-        text = re.sub(r"^```(?:json)?|```$", "", text, flags=re.MULTILINE).strip()
-        return json.loads(text)
-    except Exception as e:
-        print(f"      Gemini error: {e}")
-        return {"action": "done", "answer": "", "reasoning": f"error: {e}"}
+    # Retry transient empty / unparseable responses: gemini-2.0-flash occasionally returns an
+    # empty body on complex pages, and one blank reply shouldn't end the whole run. Model,
+    # prompt, temperature, and token limits are unchanged — this only retries the same call
+    # and records WHY a body was empty (finish_reason / block_reason) for diagnosis.
+    last_problem = None
+    for attempt in range(3):
+        text = ""
+        try:
+            response = get_model().generate_content(
+                [SYSTEM_PROMPT, *user_content],
+                generation_config={
+                    "temperature": 0,
+                    "max_output_tokens": 256,
+                    "response_mime_type": "application/json",  # constrain output to valid JSON
+                },
+            )
+            try:
+                text = (response.text or "").strip()
+            except Exception:
+                text = ""
+            # Strip markdown fences just in case (JSON mode shouldn't add them)
+            text = re.sub(r"^```(?:json)?|```$", "", text, flags=re.MULTILINE).strip()
+            if not text:
+                last_problem = f"empty response ({_response_reason(response)})"
+            else:
+                return json.loads(text)
+        except Exception as e:
+            snippet = (text[:120] + "…") if text else ""
+            last_problem = f"{e}" + (f" | body: {snippet!r}" if snippet else "")
+        print(f"      Gemini retry {attempt + 1}/3: {last_problem}")
+    print(f"      Gemini error (gave up after 3): {last_problem}")
+    # Distinct sentinel so a technical API/JSON failure is scored failure_mode='error',
+    # not conflated with a genuine wrong_extraction in the breakdown Lane 3 plots.
+    return {"action": "__error__", "reasoning": f"gemini call/parse failed: {last_problem}"}
 
 # ---------------------------------------------------------------------------
 # Agent loop
@@ -169,6 +240,12 @@ async def run_agent_on_site(
     transcript = []
     step_count = 0
 
+    # Guard: an empty answer_substring would make scoring (`'' in answer`) always True.
+    # Never edit the pre-registered key here — just refuse to score against an empty one.
+    if not (answer_substring or "").strip():
+        return _build_run(site_id, trial_number, False, 0, 0, "error",
+                          [{"step": 0, "error": "empty answer_substring — cannot score this site"}])
+
     try:
         await page.goto(url, timeout=30_000, wait_until="domcontentloaded")
     except Exception as e:
@@ -184,6 +261,10 @@ async def run_agent_on_site(
             "run_at": datetime.now(timezone.utc).isoformat(),
         }
 
+    # Loop-breaker state: detect the agent repeating the identical action on the same page.
+    last_sig = None
+    repeat_count = 0
+
     for step in range(MAX_STEPS):
         step_count = step + 1
 
@@ -194,7 +275,6 @@ async def run_agent_on_site(
         # Capture state
         try:
             screenshot_bytes = await page.screenshot(type="png")
-            screenshot_b64 = base64.b64encode(screenshot_bytes).decode()
             current_url = page.url
             title = await page.title()
             accessible_text = await page.evaluate(
@@ -205,9 +285,27 @@ async def run_agent_on_site(
                               time.time() - start, "error", transcript)
 
         # Ask Gemini
-        action = await ask_gemini(task, screenshot_b64, accessible_text, current_url, title)
+        action = await ask_gemini(task, screenshot_bytes, accessible_text, current_url, title)
         transcript.append({"step": step, "url": current_url, "action": action})
         print(f"      step {step_count}: {action.get('action')} — {action.get('reasoning', '')[:60]}")
+
+        # A technical failure inside ask_gemini (API/JSON) -> failure_mode='error', kept
+        # distinct from a genuine wrong_extraction.
+        if action.get("action") == "__error__":
+            return _build_run(site_id, trial_number, False, step_count,
+                              time.time() - start, "error", transcript)
+
+        # Loop-breaker: at temperature=0 a stuck agent repeats the SAME action on the SAME
+        # page forever (e.g. clicking an invisible element). 3 identical non-scroll actions
+        # in a row can never make progress, so stop as navigation_stuck rather than burn the
+        # whole step/time budget. (scroll is exempt — repeating it is how you read a long page.)
+        sig = (current_url, action.get("action"), action.get("selector"),
+               action.get("url"), action.get("text"))
+        repeat_count = repeat_count + 1 if sig == last_sig else 1
+        last_sig = sig
+        if repeat_count >= 3 and action.get("action") != "scroll":
+            return _build_run(site_id, trial_number, False, step_count,
+                              time.time() - start, "navigation_stuck", transcript)
 
         # Execute action
         if action.get("action") == "done":
@@ -234,7 +332,7 @@ async def run_agent_on_site(
 
         elif action.get("action") == "type":
             try:
-                await page.fill(action.get("selector", "input"), action.get("text", ""))
+                await page.fill(action.get("selector", "input"), action.get("text", ""), timeout=5_000)
                 await page.keyboard.press("Enter")
                 await page.wait_for_load_state("domcontentloaded", timeout=10_000)
             except Exception as e:
@@ -284,13 +382,15 @@ async def run_scripted_extraction(
 ) -> dict:
     """Navigate directly to the URL and use Gemini only for extraction."""
     start = time.time()
+    if not (answer_substring or "").strip():
+        return _build_run(site_id, trial_number, False, 1, 0, "error",
+                          [{"step": 1, "error": "empty answer_substring — cannot score this site"}])
     try:
         await page.goto(url, timeout=30_000, wait_until="domcontentloaded")
         accessible_text = await page.evaluate(
             "() => document.body ? document.body.innerText : ''"
         )
         screenshot_bytes = await page.screenshot(type="png")
-        screenshot_b64 = base64.b64encode(screenshot_bytes).decode()
     except Exception as e:
         return _build_run(site_id, trial_number, False, 1,
                           time.time() - start, "error", [])
@@ -302,13 +402,16 @@ async def run_scripted_extraction(
     )
     try:
         response = get_model().generate_content(
-            [extraction_prompt, {"mime_type": "image/png", "data": screenshot_b64},
+            [extraction_prompt, {"mime_type": "image/png", "data": screenshot_bytes},
              accessible_text[:3000]],
             generation_config={"temperature": 0, "max_output_tokens": 128},
         )
         answer = response.text.strip()
     except Exception as e:
-        answer = ""
+        # A real API failure is a technical error, not a wrong extraction — keep the
+        # fallback's failure-mode breakdown honest for the Saturday-6pm call.
+        return _build_run(site_id, trial_number, False, 1,
+                          time.time() - start, "error", [{"step": 1, "error": str(e)}])
 
     success = answer_substring.lower() in answer.lower()
     mode = "success" if success else "wrong_extraction"
@@ -326,6 +429,10 @@ async def main():
     parser.add_argument("--trials", type=int, default=DEFAULT_TRIALS)
     parser.add_argument("--scripted-only", action="store_true",
                         help="Saturday 6pm fallback: scripted nav + Gemini extraction only")
+    parser.add_argument("--dry-run", action="store_true",
+                        help="Write runs to a local JSONL file instead of Firestore (no Firebase creds needed)")
+    parser.add_argument("--out", default="lane2-runs.jsonl",
+                        help="Local sink path when --dry-run is set (default: lane2-runs.jsonl)")
     args = parser.parse_args()
 
     cohort_path = Path(__file__).parent / "cohort.json"
@@ -341,6 +448,8 @@ async def main():
     run_fn_name = "scripted extraction" if args.scripted_only else "full agent"
     print(f"\nLane 2 — Gemini {run_fn_name}")
     print(f"Sites: {len(cohort)}  Trials: {args.trials}  Model: {GEMINI_MODEL}")
+    if args.dry_run:
+        print(f"Dry-run: writing to {args.out} (no Firestore)")
     print("-" * 60)
 
     async with async_playwright() as pw:
@@ -348,43 +457,43 @@ async def main():
             headless=True,
             args=["--no-sandbox", "--disable-gpu", "--disable-dev-shm-usage"],
         )
+        try:
+            for site in cohort:
+                print(f"\n[{site['site_id']}] {site['name']}")
+                # IMPORTANT: never inject the answer value (answer_substring / answer_note) into the
+                # prompt — the model could then echo the answer without browsing, which would
+                # invalidate success_rate and the headline correlation. Use the neutral task_hint,
+                # which names WHAT to find, not its value.
+                hint = (site.get("task_hint") or "").strip()
+                task = TASK_TEMPLATE.format(task_hint=f"Specifically, find: {hint}." if hint else "")
 
-        for site in cohort:
-            print(f"\n[{site['site_id']}] {site['name']}")
-            # IMPORTANT: never inject the answer value (answer_substring / answer_note) into the
-            # prompt — the model could then echo the answer without browsing, which would
-            # invalidate success_rate and the headline correlation. Use the neutral task_hint,
-            # which names WHAT to find, not its value.
-            hint = (site.get("task_hint") or "").strip()
-            task = TASK_TEMPLATE.format(task_hint=f"Specifically, find: {hint}." if hint else "")
-
-            for trial in range(1, args.trials + 1):
-                print(f"  Trial {trial}/{args.trials}")
-                context = await browser.new_context(
-                    viewport={"width": 1280, "height": 800},
-                    user_agent=(
-                        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-                        "AppleWebKit/537.36 (KHTML, like Gecko) "
-                        "Chrome/124.0.0.0 Safari/537.36"
-                    ),
-                )
-                page = await context.new_page()
-
-                if args.scripted_only:
-                    run = await run_scripted_extraction(
-                        page, site["site_id"], site["url"],
-                        task, site["answer_substring"], trial,
+                for trial in range(1, args.trials + 1):
+                    print(f"  Trial {trial}/{args.trials}")
+                    context = await browser.new_context(
+                        viewport={"width": 1280, "height": 800},
+                        user_agent=(
+                            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                            "AppleWebKit/537.36 (KHTML, like Gecko) "
+                            "Chrome/124.0.0.0 Safari/537.36"
+                        ),
                     )
-                else:
-                    run = await run_agent_on_site(
-                        page, site["site_id"], site["url"],
-                        task, site["answer_substring"], trial,
-                    )
+                    page = await context.new_page()
 
-                await context.close()
-                write_run(run)
+                    if args.scripted_only:
+                        run = await run_scripted_extraction(
+                            page, site["site_id"], site["url"],
+                            task, site["answer_substring"], trial,
+                        )
+                    else:
+                        run = await run_agent_on_site(
+                            page, site["site_id"], site["url"],
+                            task, site["answer_substring"], trial,
+                        )
 
-        await browser.close()
+                    await context.close()
+                    write_run(run, dry_run=args.dry_run, out_path=args.out)
+        finally:
+            await browser.close()
 
     print("\n✓ Lane 2 complete.")
 

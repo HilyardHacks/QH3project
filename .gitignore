@@ -20,6 +20,9 @@ __pycache__/
 *.pyc
 .venv/
 
+# Lane 2 local dry-run output (runs go to Firestore, not git)
+lane2-runs*.jsonl
+
 # Firebase
 .firebase/
 
