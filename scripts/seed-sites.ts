@@ -15,6 +15,9 @@
  * (seed-firestore.ts is the separate fake-demo seeder for the 3 hand-written rows.)
  */
 
+import { config } from "dotenv";
+config({ path: ".env.local" });
+
 import cohortRaw from "./cohort.json";
 import type { Site } from "../lib/types";
 
