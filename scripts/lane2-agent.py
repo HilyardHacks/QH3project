@@ -121,6 +121,31 @@ def write_run(run: dict, dry_run: bool = False, out_path: str = "lane2-runs.json
     db.collection("runs").document(doc_id).set(run)
     print(f"    ✓ Wrote runs/{doc_id}  success={run['success']}  steps={run['step_count']}")
 
+
+def _existing_runs(dry_run: bool, out_path: str) -> set:
+    """--resume helper: the set of {site_id}_t{trial} doc ids already recorded, so a crash
+    + naive re-run skips finished trials instead of double-counting. Uses the deterministic
+    doc id — no new schema field."""
+    existing = set()
+    if dry_run:
+        p = Path(out_path)
+        if p.exists():
+            for line in p.read_text(encoding="utf-8").splitlines():
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    r = json.loads(line)
+                    existing.add(f"{r['site_id']}_t{r['trial_number']}")
+                except Exception:
+                    pass
+    else:
+        try:
+            existing = {d.id for d in get_db().collection("runs").list_documents()}
+        except Exception:
+            existing = set()
+    return existing
+
 # ---------------------------------------------------------------------------
 # Gemini client
 # ---------------------------------------------------------------------------
@@ -433,6 +458,8 @@ async def main():
                         help="Write runs to a local JSONL file instead of Firestore (no Firebase creds needed)")
     parser.add_argument("--out", default="lane2-runs.jsonl",
                         help="Local sink path when --dry-run is set (default: lane2-runs.jsonl)")
+    parser.add_argument("--resume", action="store_true",
+                        help="Skip (site, trial) pairs already recorded — crash-safe re-runs")
     args = parser.parse_args()
 
     cohort_path = Path(__file__).parent / "cohort.json"
@@ -452,6 +479,10 @@ async def main():
         print(f"Dry-run: writing to {args.out} (no Firestore)")
     print("-" * 60)
 
+    existing = _existing_runs(args.dry_run, args.out) if args.resume else set()
+    if args.resume:
+        print(f"Resume: {len(existing)} run(s) already recorded will be skipped")
+
     async with async_playwright() as pw:
         browser = await pw.chromium.launch(
             headless=True,
@@ -468,6 +499,10 @@ async def main():
                 task = TASK_TEMPLATE.format(task_hint=f"Specifically, find: {hint}." if hint else "")
 
                 for trial in range(1, args.trials + 1):
+                    doc_id = f"{site['site_id']}_t{trial}"
+                    if args.resume and doc_id in existing:
+                        print(f"  Trial {trial}/{args.trials}: skip (already have runs/{doc_id})")
+                        continue
                     print(f"  Trial {trial}/{args.trials}")
                     context = await browser.new_context(
                         viewport={"width": 1280, "height": 800},
