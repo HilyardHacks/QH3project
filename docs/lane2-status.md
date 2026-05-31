@@ -2,35 +2,36 @@
 
 _Updated 2026-05-31 · Branch: `harness`_
 
-This is the human-readable handoff. (The harness's own session memory also persists for the
-AI assistant, so a fresh chat picks up with full context.)
+Human-readable handoff. (The AI assistant's session memory also persists, so a fresh chat
+picks up with full context — just say "continue Lane 2".)
 
 ## ✅ Done (committed on `harness`)
 
-- **Harness hardened + frozen** (`2edc2f4`): raw-bytes image input, **JSON mode + 3× retry** (kills prose/empty-response failures), de-masked technical errors, empty-substring guard, **3-identical-actions loop-breaker**, `--dry-run`/`--out` local sink, UTF-8 stdout, browser try/finally, 5s fill timeout. Frozen-measurement surface documented in the file's banner.
-- **`--resume`** (`7872c12`): crash-safe re-runs (skip-if-exists on `{site_id}_t{trial}`) — proven (re-run skipped all rows, 0 new).
-- **5-site gate passed** + validated on hard *homepage* tasks via a probe (stripe homepage → real multi-step success; the deep-link 1-step "win" is gone).
-- **Firebase wired + verified**: `service-account.json` (gitignored) + `.env.local` → `GOOGLE_APPLICATION_CREDENTIALS`; write/read/delete to project `agentrank-quackhacks` succeeded.
-- **Cohort-redesign brief** for Member 4 (`d84825b`): [docs/cohort-redesign-brief.md](./cohort-redesign-brief.md).
+- **Harness hardened + frozen** (`2edc2f4`): raw-bytes image, JSON mode + retry, de-masked errors, empty-substring guard, 3-identical-actions loop-breaker, `--dry-run`/`--out`, UTF-8 stdout, browser try/finally, 5s fill timeout.
+- **`--resume`** (`7872c12`): crash-safe re-runs (skip-if-exists on doc id), proven.
+- **Firebase wired + verified**: `service-account.json` + `GOOGLE_APPLICATION_CREDENTIALS`; write/read/delete to `agentrank-quackhacks` OK.
+- **Cohort brief delivered** (`docs/cohort-redesign-brief.md`), and **cohort received back from Member 4** → `scripts/cohort-source/` (28 sites: `agentrank_sites.csv` + `agentrank_cohort.md` + `agentrank_scoring_rules.md`). Strong: pre-registered discriminating answers, off-diagonal picks, 2 blockers.
 
-## ⛔ The one thing blocking the finish
+## ⛔ Before the full run can happen
 
-**Full cohort run (#8)** → waits on **the redesigned + frozen cohort** (Member 4 / your groupmate). Firebase is no longer a blocker. Everything downstream (real success rates → the leaderboard + correlation scatter → the 0/5-and-perfect-site sanity checks) sits behind the full run.
+**From Member 4** — fill the **6 placeholder URLs** (`[confirm …]`): `bestbuy`, `ikea`, `powells`, `zalando`, `amazon`, `ticketmaster` (exact product/event pages).
 
-## 👉 Exactly what to do next (James)
+**On the harness (Lane 2 — the fresh-chat work):**
+1. **Upgrade the scorer** to implement `agentrank_scoring_rules.md` faithfully — today's plain substring check is insufficient. Needs: any-of (split `" | "`), strip `$`/`€`, strip thousands-commas + trailing `.00` (whole-dollar), keep decimals, **numeric word-boundary** (`$20`≠`$200`), Zalando comma-decimal exception, Voodoo digit-normalize. *(Never-cut credibility piece.)*
+2. **Per-site question** — feed each site's `question` to the agent (the generic "primary product/service" task is wrong for gov/info pages; questions are leak-free). Reopens the provisional freeze (expected).
+3. **Convert** `scripts/cohort-source/agentrank_sites.csv` → `scripts/cohort.json` (carry `question`/`match_rule`/`flag`/`tier`).
+4. **Re-gate** a few new sites (a gov + an off-diagonal), then re-freeze.
 
-1. **Send the brief to your groupmate** — team chat (paste it or share `docs/cohort-redesign-brief.md`). *This is the critical path:* the full run can't start until they switch sites to **homepage starts + buried facts** and freeze all 30 `answer_substring`s.
-2. **Get the branch pushed.** `harness` has unpushed commits; pushing has 403'd for your account, so either fix repo access or have a teammate with push rights push it — so the team can pull the brief + harness. (Until then, the brief lives in chat.)
-3. **Pre-write the Saturday-6pm go/no-go bar** (#7) — e.g. *"≥4/5 of the gate sites terminate cleanly + the 2 known-good pass → run the full agent; otherwise switch the whole cohort to `--scripted-only`."* No dependencies; decide it in advance.
-4. **When the cohort is frozen → open a fresh chat** and say *"continue Lane 2 — run the full cohort."* The assistant will: run 30×5 to Firestore, then sanity-check any 0/5 or perfect sites against transcripts (#9–10).
+## Then
 
-## 🟢 Can proceed in parallel (not blocked)
+- **Full run** (28×5 → Firestore; Firebase ✓), then sanity-check 0/5 & perfect sites (#9–10). Re-verify volatile prices (amazon/bestbuy/ikea/zalando) right before.
+- **#6 blocked-before-task rule** — verify `BLOCKED` fires on amazon/ticketmaster (folds in naturally now).
 
-- **Me/Lane 2:** **#6** — the blocked-before-task rule + a live wall-site check (nytimes/amazon), so anti-bot walls score `blocked` (excluded), not fake low-readiness. The only unstarted Lane-2 build item; can be done anytime.
-- **Lane 1:** Lighthouse scoring (the x-axis) — fully independent, runnable now.
-- **Lane 3:** frontend already builds on fake data; wire to real `runs` after #8.
-- **Seeding:** once the cohort is locked, `npm run seed:sites` populates Firestore `sites`.
+## Parallel / other lanes
 
-## Resuming with the AI in a new chat
+- **Lane 1** Lighthouse scoring (x-axis) — independent, runnable now.
+- **Lane 3** frontend builds on fake data → wire to real `runs` after the run; `npm run seed:sites` once `cohort.json` is final.
 
-Memory carries the full state — just start a new chat and say **"continue Lane 2."** Good first asks: *"do #6 (blocked-rule)"* now, or *"run the full cohort"* once the groupmate has frozen `cohort.json`.
+## Resuming in a new chat
+
+Say **"continue Lane 2 — start the scorer upgrade."** The cohort source is in `scripts/cohort-source/`; the scoring spec is `agentrank_scoring_rules.md`. Order: scorer upgrade (#1) + CSV→cohort.json (#3) → per-site question (#2) → re-gate (#4).
