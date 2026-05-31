@@ -1,3 +1,11 @@
+> **SUPERSEDED — DO NOT EDIT.** The canonical cohort is now
+> `scripts/cohort-source/agentrank_sites.csv` (28 sites, with pre-registered
+> `answer_substring`s, `question`, `match_rule`, `flag`, and `tier`) plus the generated
+> `scripts/cohort.json` that the harness reads. This worklist was the original 30-site
+> planning scratchpad; its `site_id`s and blank answer columns have diverged from the
+> canonical source. It is kept for history only — **do not edit it and do not feed it to
+> the harness.** Make all cohort changes in the CSV (and regenerate `cohort.json`).
+
 # AgentRank — Manual Cohort Pass Worklist (30 sites)
 
 Each site is chosen to land in a different region of the correlation chart, so the
