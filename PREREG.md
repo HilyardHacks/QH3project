@@ -127,6 +127,36 @@ pre-registration.
 - The headline correlation is computed over the cohort's `(lh_total, success_rate)`
   points (see §5 for which points are included).
 
+### 3.1 Two measurement conditions (the "measure both" design)
+
+Each site is measured under **two pre-registered conditions**, so we can separate
+*reading* a page from *finding* it:
+
+| Condition | Start URL | Agent | Firestore collection | Measures |
+|---|---|---|---|---|
+| **navigation** | site **homepage** (front door) | full autonomous agent | `runs` | navigation + extraction |
+| **extraction** | site **deep-link** (answer page) | scripted nav + single Gemini extraction | `runs_extraction` | extraction only (control) |
+
+Both conditions use the **same** frozen model / prompt / limits / scorer; only the
+start URL and the navigation driver differ. Each produces its own `success_rate` per
+site under the identical scoring rule (§2).
+
+**Pre-registered analysis:**
+- `success_rate_nav` (homepage + full agent) is the primary y-axis — it tests whether
+  the agent can *browse* a site, which is what the Lighthouse Agentic Browsing score
+  claims to predict.
+- `success_rate_ext` (deep-link + scripted) is a **control** for "can the agent even
+  read the answer page," holding navigation difficulty out.
+- The **navigation gap** `gap(site) = success_rate_ext − success_rate_nav` isolates the
+  cost of navigation. We pre-register correlating `lh_total` against **all three**:
+  `success_rate_nav`, `success_rate_ext`, and `gap`. The directional prediction is that
+  the rubric tracks navigability (the gap / nav) more than raw extraction.
+
+The Saturday-6pm decision (§6 note) governs only whether the **navigation** condition's
+full-agent data is clean enough to headline; if not, the cohort falls back to scripted
+extraction (`--scripted-only` → `runs`) and the result is reported as *extraction
+reliability*, not autonomous navigation. The `extraction` control runs regardless.
+
 ---
 
 ## 4. Failure-mode taxonomy (6 values, frozen)

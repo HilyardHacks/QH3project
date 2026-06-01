@@ -36,6 +36,7 @@ import json
 import re
 import sys
 from pathlib import Path
+from urllib.parse import urlsplit
 
 HERE = Path(__file__).resolve().parent
 CSV_PATH = HERE / "cohort-source" / "agentrank_sites.csv"
@@ -133,6 +134,27 @@ def _derive_task_hint(question: str) -> str:
 
 
 # ---------------------------------------------------------------------------
+# homepage derivation: scheme://host of the deep-link url.
+# ---------------------------------------------------------------------------
+#
+# Lane 2's "measure both" design starts the FULL AGENT from the homepage (to measure
+# navigation difficulty) and the SCRIPTED extractor from the deep link (to measure raw
+# extractability). The homepage is just the origin of the deep-link url:
+#   https://stripe.com/pricing            -> https://stripe.com
+#   https://www.ssa.gov/benefits/...html  -> https://www.ssa.gov
+# The 6 placeholder rows have a literal "[confirm ...]" url with no derivable host, so
+# their homepage is "" (they stay runnable=false; the harness skips navigation for them).
+
+def _derive_homepage(url: str) -> str:
+    """Return scheme://host of `url`, or "" if it has no derivable scheme+host
+    (e.g. the placeholder "[confirm ...]" markers)."""
+    parts = urlsplit((url or "").strip())
+    if not parts.scheme or not parts.netloc:
+        return ""
+    return f"{parts.scheme}://{parts.netloc}"
+
+
+# ---------------------------------------------------------------------------
 # Anti-leak check
 # ---------------------------------------------------------------------------
 
@@ -184,6 +206,7 @@ def build_rows():
                 "name": (raw.get("name") or "").strip(),
                 "tier": (raw.get("tier") or "").strip(),
                 "url": start_url,                       # VERBATIM (incl. "[confirm...]")
+                "homepage": _derive_homepage(start_url),  # scheme://host of url; "" for placeholders
                 "question": question,
                 "task_hint": _derive_task_hint(question),
                 "answer_substring": answer_substring,   # VERBATIM (incl. any-of " | ")
@@ -222,17 +245,25 @@ def print_summary(rows):
     print(f"\nWrote {len(rows)} sites -> {OUT_PATH}\n")
     sid_w = max(len("site_id"), *(len(r["site_id"]) for r in rows))
     run_w = len("runnable")
-    header = f"{'site_id':<{sid_w}} | {'runnable':<{run_w}} | url-or-PENDING"
+    hp_w = max(len("homepage"), *(len(r["homepage"] or "(blank)") for r in rows))
+    header = (f"{'site_id':<{sid_w}} | {'runnable':<{run_w}} | "
+              f"{'homepage':<{hp_w}} | url-or-PENDING")
     print(header)
     print("-" * len(header))
     n_run = 0
+    n_homepage = 0
     for r in rows:
         runnable = r["runnable"]
         n_run += 1 if runnable else 0
+        n_homepage += 1 if (r["homepage"] or "").strip() else 0
+        hp_cell = r["homepage"] or "(blank)"
         url_cell = r["url"] if runnable else "PENDING (needs_url)"
-        print(f"{r['site_id']:<{sid_w}} | {str(runnable):<{run_w}} | {url_cell}")
+        print(f"{r['site_id']:<{sid_w}} | {str(runnable):<{run_w}} | "
+              f"{hp_cell:<{hp_w}} | {url_cell}")
     print("-" * len(header))
     print(f"{n_run}/{len(rows)} runnable, {len(rows) - n_run} pending URL confirmation.")
+    print(f"{n_homepage}/{len(rows)} with a homepage, {len(rows) - n_homepage} blank "
+          "(placeholders).")
 
 
 def main():

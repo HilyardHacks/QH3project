@@ -1,22 +1,38 @@
 """
 Lane 2 — Gemini browser-agent harness
 
-Runs a fixed Gemini agent through a fixed task on each site in the cohort,
-scores the output against the pre-registered answer_substring, and writes
-one `runs` document per trial to Firestore.
+Measures, per cohort site, how a fixed Gemini agent fares on a fixed task and writes
+one run document per trial to Firestore. There are two conditions ("measure both"):
+
+  navigation  — start from the site HOMEPAGE and let the FULL AGENT browse to the
+                answer. Writes to collection "runs". This is the y-axis of the
+                experiment (real agent success rate).
+  extraction  — start from the DEEP-LINK url and use the SCRIPTED extractor (single
+                Gemini call on the loaded page). Writes to collection "runs_extraction".
+                This isolates raw extractability.
+
+The per-site gap (extraction success - navigation success) is the navigation-difficulty
+signal: pages an agent CAN read once landed but CAN'T reach on its own.
 
 Usage:
-    # All cohort sites, 5 trials each
+    # All cohort sites, 5 trials each — navigation condition (default)
     python scripts/lane2-agent.py
 
     # Specific site IDs, N trials
-    python scripts/lane2-agent.py --sites stripe vercel --trials 3
+    python scripts/lane2-agent.py --sites stripe github --trials 3
 
-    # Decision-gate fallback: scripted nav + Gemini extraction only
-    python scripts/lane2-agent.py --scripted-only --sites irs_gov
+    # Measure both conditions per site (navigation then extraction)
+    python scripts/lane2-agent.py --mode both
 
-    # Run without Firebase: write runs to a local JSONL file instead of Firestore
-    python scripts/lane2-agent.py --sites stripe vercel --trials 1 --dry-run
+    # Only the deep-link scripted-extraction condition
+    python scripts/lane2-agent.py --mode extraction
+
+    # Decision-gate whole-cohort fallback: force scripted runner on the deep-link url,
+    # writing to the legacy "runs" collection (back-compat; overrides --mode).
+    python scripts/lane2-agent.py --scripted-only --sites irs
+
+    # Run without Firebase: write runs to local JSONL file(s) instead of Firestore
+    python scripts/lane2-agent.py --sites stripe github --trials 1 --dry-run --mode both
 
 Requirements:
     pip install -r scripts/requirements.txt
@@ -74,10 +90,17 @@ from firebase_admin import credentials, firestore
 #   timeouts (goto 30s / navigate 20s / click+type 5s / load 10s), and the
 #   3-identical-actions loop-breaker. Pure bug fixes that don't change what the
 #   agent sees or does are fine; anything behavioral is not.
+#
+# FREEZE REOPENED 2026-05-31 for the "measure both" / homepage-start navigation change:
+# MAX_STEPS and TIMEOUT_SECONDS were RAISED (15->25, 90->150) to give the agent room to
+# browse from a site's HOMEPAGE (the old gate used deep-link starts that landed on the
+# answer page in ~1 step). These two values are PROVISIONAL — confirm them against the
+# observed step counts / timeouts in the homepage re-gate (5 sites, `--mode both`), then
+# RE-FREEZE before the full cohort run. Everything else above is unchanged.
 
 GEMINI_MODEL = "gemini-2.0-flash"      # fast, cheap, multimodal
-MAX_STEPS = 15
-TIMEOUT_SECONDS = 90
+MAX_STEPS = 25         # raised from 15 for homepage-start navigation (provisional; re-gate)
+TIMEOUT_SECONDS = 150  # raised from 90 to match the higher step budget (provisional; re-gate)
 DEFAULT_TRIALS = 5
 
 TASK_TEMPLATE = (
@@ -109,7 +132,13 @@ def get_db():
     return _db
 
 
-def write_run(run: dict, dry_run: bool = False, out_path: str = "lane2-runs.jsonl"):
+def write_run(run: dict, *, collection: str = "runs", dry_run: bool = False,
+              out_path: str = "lane2-runs.jsonl"):
+    """Persist one run document. `collection` selects the Firestore collection
+    ("runs" for navigation, "runs_extraction" for extraction); in dry-run mode
+    `out_path` is the per-condition local sink. The doc id is f"{site_id}_t{trial}";
+    it can collide across conditions only WITHIN a collection, and the two conditions
+    write to different collections (and different dry-run files), so there is no clash."""
     doc_id = f"{run['site_id']}_t{run['trial_number']}"
     if dry_run:
         # Local-JSON sink: write the run document VERBATIM — byte-for-byte the same dict
@@ -117,17 +146,19 @@ def write_run(run: dict, dry_run: bool = False, out_path: str = "lane2-runs.json
         # id is derivable from site_id + trial_number at read time, so the schema stays clean.
         with open(out_path, "a", encoding="utf-8") as f:
             f.write(json.dumps(run) + "\n")
-        print(f"    [dry-run] runs/{doc_id}  success={run['success']}  steps={run['step_count']}  -> {out_path}")
+        print(f"    [dry-run] {collection}/{doc_id}  success={run['success']}  steps={run['step_count']}  -> {out_path}")
         return
     db = get_db()
-    db.collection("runs").document(doc_id).set(run)
-    print(f"    ✓ Wrote runs/{doc_id}  success={run['success']}  steps={run['step_count']}")
+    db.collection(collection).document(doc_id).set(run)
+    print(f"    ✓ Wrote {collection}/{doc_id}  success={run['success']}  steps={run['step_count']}")
 
 
-def _existing_runs(dry_run: bool, out_path: str) -> set:
-    """--resume helper: the set of {site_id}_t{trial} doc ids already recorded, so a crash
-    + naive re-run skips finished trials instead of double-counting. Uses the deterministic
-    doc id — no new schema field."""
+def _existing_runs(dry_run: bool, out_path: str, collection: str = "runs") -> set:
+    """--resume helper: the set of {site_id}_t{trial} doc ids already recorded FOR THIS
+    CONDITION, so a crash + naive re-run skips finished trials instead of double-counting.
+    Collection-aware: navigation checks the "runs" collection / its dry-run file, extraction
+    checks "runs_extraction" / its own file — so resuming one condition never skips the
+    other's trials. Uses the deterministic doc id — no new schema field."""
     existing = set()
     if dry_run:
         p = Path(out_path)
@@ -143,7 +174,7 @@ def _existing_runs(dry_run: bool, out_path: str) -> set:
                     pass
     else:
         try:
-            existing = {d.id for d in get_db().collection("runs").list_documents()}
+            existing = {d.id for d in get_db().collection(collection).list_documents()}
         except Exception:
             existing = set()
     return existing
@@ -447,6 +478,59 @@ async def run_scripted_extraction(
                       time.time() - start, mode, transcript)
 
 # ---------------------------------------------------------------------------
+# Condition resolution (PURE — unit-testable, no Gemini/Playwright/Firebase)
+# ---------------------------------------------------------------------------
+
+def _extraction_sink(base_out: str) -> str:
+    """Derive the extraction dry-run sink from the base --out path by inserting
+    '-extraction' before the suffix: 'lane2-runs.jsonl' -> 'lane2-runs-extraction.jsonl'.
+    Pure path string manipulation; no filesystem access."""
+    p = Path(base_out)
+    # p.stem drops the final suffix; p.suffix is e.g. '.jsonl' (''. if none). Reattach the
+    # parent so a path like 'out/run.jsonl' becomes 'out/run-extraction.jsonl'.
+    new_name = f"{p.stem}-extraction{p.suffix}"
+    return str(p.with_name(new_name))
+
+
+def resolve_condition(site: dict, condition: str, base_out: str = "lane2-runs.jsonl") -> dict:
+    """Resolve a (site, condition) pair into the concrete run plan. PURE: no network,
+    no Gemini/Playwright/Firebase — safe to import and unit-test standalone.
+
+    Returns a dict with:
+      start_url   — where this condition begins browsing
+      runner_name — "agent" (full agent) or "scripted" (single-call extraction)
+      collection  — Firestore collection to write to
+      dry_sink    — local JSONL sink path for --dry-run
+
+    navigation -> homepage start + full agent  -> collection "runs",            base sink
+    extraction -> deep-link start + scripted   -> collection "runs_extraction",  '-extraction' sink
+    """
+    if condition == "navigation":
+        return {
+            "start_url": site.get("homepage", ""),
+            "runner_name": "agent",
+            "collection": "runs",
+            "dry_sink": base_out,
+        }
+    if condition == "extraction":
+        return {
+            "start_url": site.get("url", ""),
+            "runner_name": "scripted",
+            "collection": "runs_extraction",
+            "dry_sink": _extraction_sink(base_out),
+        }
+    raise ValueError(f"unknown condition: {condition!r} (expected 'navigation' or 'extraction')")
+
+
+# Expand a --mode value into the ordered list of conditions to run.
+_MODE_CONDITIONS = {
+    "navigation": ["navigation"],
+    "extraction": ["extraction"],
+    "both": ["navigation", "extraction"],  # navigation first, then extraction
+}
+
+
+# ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
 
@@ -454,14 +538,24 @@ async def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--sites", nargs="*", help="Site IDs to run (default: all)")
     parser.add_argument("--trials", type=int, default=DEFAULT_TRIALS)
+    parser.add_argument("--mode", choices=["navigation", "extraction", "both"],
+                        default="navigation",
+                        help="Which condition(s) to measure per site. "
+                             "navigation = homepage start + full agent -> 'runs'; "
+                             "extraction = deep-link start + scripted -> 'runs_extraction'; "
+                             "both = navigation then extraction. (default: navigation)")
     parser.add_argument("--scripted-only", action="store_true",
-                        help="Saturday 6pm fallback: scripted nav + Gemini extraction only")
+                        help="BACK-COMPAT whole-cohort fallback (Saturday-6pm call): force the "
+                             "scripted runner on the deep-link url, writing to the legacy 'runs' "
+                             "collection — regardless of --mode.")
     parser.add_argument("--dry-run", action="store_true",
                         help="Write runs to a local JSONL file instead of Firestore (no Firebase creds needed)")
     parser.add_argument("--out", default="lane2-runs.jsonl",
-                        help="Local sink path when --dry-run is set (default: lane2-runs.jsonl)")
+                        help="Local sink path when --dry-run is set (default: lane2-runs.jsonl; "
+                             "the extraction condition writes to a '-extraction' sibling)")
     parser.add_argument("--resume", action="store_true",
-                        help="Skip (site, trial) pairs already recorded — crash-safe re-runs")
+                        help="Skip (site, trial) pairs already recorded — crash-safe re-runs "
+                             "(collection-aware: each condition resumes against its own collection)")
     args = parser.parse_args()
 
     cohort_path = Path(__file__).parent / "cohort.json"
@@ -474,16 +568,62 @@ async def main():
         print("No matching sites.")
         sys.exit(1)
 
-    run_fn_name = "scripted extraction" if args.scripted_only else "full agent"
-    print(f"\nLane 2 — Gemini {run_fn_name}")
+    # --scripted-only is a BACK-COMPAT override of --mode: it forces a single legacy
+    # condition — scripted runner on the DEEP-LINK url, writing to the "runs" collection
+    # and the base --out sink (exactly the pre-"measure both" behavior). It is NOT the same
+    # as --mode extraction (which writes to "runs_extraction"). Used only for the whole-cohort
+    # Saturday-6pm fallback when the full agent is deemed too flaky to be the y-axis.
+    # OPERATIONAL CAVEAT: --scripted-only shares the "runs" collection + {site_id}_t{trial}
+    # doc-id scheme with --mode navigation, so do NOT --resume across a MIX of navigation and
+    # --scripted-only writes into the same "runs" (each would skip the other's trials). Run the
+    # scripted fallback as a clean re-run (or into a separate sink/collection) if you've already
+    # written navigation rows.
+    if args.scripted_only:
+        conditions = ["__legacy_scripted__"]
+        mode_desc = "scripted-only (legacy: scripted on deep-link -> 'runs')"
+    else:
+        conditions = _MODE_CONDITIONS[args.mode]
+        mode_desc = f"mode={args.mode} ({' then '.join(conditions)})"
+
+    print(f"\nLane 2 — Gemini harness  [{mode_desc}]")
     print(f"Sites: {len(cohort)}  Trials: {args.trials}  Model: {GEMINI_MODEL}")
     if args.dry_run:
         print(f"Dry-run: writing to {args.out} (no Firestore)")
     print("-" * 60)
 
-    existing = _existing_runs(args.dry_run, args.out) if args.resume else set()
-    if args.resume:
-        print(f"Resume: {len(existing)} run(s) already recorded will be skipped")
+    # Per-condition resume sets: each condition resumes against its OWN collection / sink,
+    # so resuming navigation never skips extraction trials and vice-versa.
+    def _resume_set(collection: str, out_path: str) -> set:
+        if not args.resume:
+            return set()
+        s = _existing_runs(args.dry_run, out_path, collection)
+        print(f"Resume[{collection}]: {len(s)} run(s) already recorded will be skipped")
+        return s
+
+    # Precompute, per condition name, the resolved plan + resume set so we don't recompute
+    # per trial. For --scripted-only we synthesize the legacy plan directly.
+    plans = {}        # condition -> {start_url_key, runner_name, collection, dry_sink}
+    resume_sets = {}  # condition -> set of existing doc ids
+    if args.scripted_only:
+        plans["__legacy_scripted__"] = {
+            "runner_name": "scripted",
+            "collection": "runs",
+            "dry_sink": args.out,
+            "url_key": "url",  # deep-link url
+        }
+        resume_sets["__legacy_scripted__"] = _resume_set("runs", args.out)
+    else:
+        for cond in conditions:
+            # resolve_condition needs a site for start_url, but collection/sink/runner are
+            # site-independent — resolve once with a probe row to read those fields.
+            probe = resolve_condition({"homepage": "", "url": ""}, cond, args.out)
+            plans[cond] = {
+                "runner_name": probe["runner_name"],
+                "collection": probe["collection"],
+                "dry_sink": probe["dry_sink"],
+                "url_key": "homepage" if cond == "navigation" else "url",
+            }
+            resume_sets[cond] = _resume_set(probe["collection"], probe["dry_sink"])
 
     async with async_playwright() as pw:
         browser = await pw.chromium.launch(
@@ -493,11 +633,13 @@ async def main():
         try:
             for site in cohort:
                 print(f"\n[{site['site_id']}] {site['name']}")
-                # SKIP-GUARD: a cohort row is runnable only if it has a real URL. Placeholder
-                # rows (the 6 "[confirm ... product page URL]" markers) carry runnable=false and
-                # a literal "[confirm..." url — running them would just goto a bogus URL and burn
-                # trials/Gemini calls. Skip them cleanly. Default runnable=True so older cohorts
-                # (no 'runnable' field) still run unchanged.
+                # SKIP-GUARD: a cohort row is runnable only if it has a real deep-link URL.
+                # Placeholder rows (the 6 "[confirm ... product page URL]" markers) carry
+                # runnable=false and a literal "[confirm..." url — running them would just goto a
+                # bogus URL and burn trials/Gemini calls. Skip them cleanly. Default runnable=True
+                # so older cohorts (no 'runnable' field) still run unchanged. This guard covers
+                # the extraction condition's deep-link url; navigation has an extra blank-homepage
+                # guard below.
                 url = (site.get("url") or "")
                 if site.get("runnable", True) is False or not url or url.startswith("[confirm"):
                     print(f"  skipped (needs URL) — runnable={site.get('runnable', True)} url={url!r}")
@@ -509,35 +651,54 @@ async def main():
                 hint = (site.get("task_hint") or "").strip()
                 task = TASK_TEMPLATE.format(task_hint=f"Specifically, find: {hint}." if hint else "")
 
-                for trial in range(1, args.trials + 1):
-                    doc_id = f"{site['site_id']}_t{trial}"
-                    if args.resume and doc_id in existing:
-                        print(f"  Trial {trial}/{args.trials}: skip (already have runs/{doc_id})")
+                for cond in conditions:
+                    plan = plans[cond]
+                    collection = plan["collection"]
+                    dry_sink = plan["dry_sink"]
+                    start_url = (site.get(plan["url_key"]) or "")
+                    existing = resume_sets[cond]
+                    cond_label = "scripted-only" if cond == "__legacy_scripted__" else cond
+
+                    # Navigation starts from the homepage; placeholder rows (and any runnable
+                    # row missing a homepage) have a blank homepage and cannot be navigated.
+                    # The extraction/legacy conditions use the deep-link url, already guarded
+                    # above, so this only fires for navigation.
+                    if not start_url:
+                        print(f"  [{cond_label}] skipped — no start URL "
+                              f"(blank {plan['url_key']}); cannot run this condition")
                         continue
-                    print(f"  Trial {trial}/{args.trials}")
-                    context = await browser.new_context(
-                        viewport={"width": 1280, "height": 800},
-                        user_agent=(
-                            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-                            "AppleWebKit/537.36 (KHTML, like Gecko) "
-                            "Chrome/124.0.0.0 Safari/537.36"
-                        ),
-                    )
-                    page = await context.new_page()
 
-                    if args.scripted_only:
-                        run = await run_scripted_extraction(
-                            page, site["site_id"], site["url"],
-                            task, site["answer_substring"], trial,
+                    for trial in range(1, args.trials + 1):
+                        doc_id = f"{site['site_id']}_t{trial}"
+                        if args.resume and doc_id in existing:
+                            print(f"  [{cond_label}] Trial {trial}/{args.trials}: "
+                                  f"skip (already have {collection}/{doc_id})")
+                            continue
+                        print(f"  [{cond_label}] Trial {trial}/{args.trials}")
+                        context = await browser.new_context(
+                            viewport={"width": 1280, "height": 800},
+                            user_agent=(
+                                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                                "AppleWebKit/537.36 (KHTML, like Gecko) "
+                                "Chrome/124.0.0.0 Safari/537.36"
+                            ),
                         )
-                    else:
-                        run = await run_agent_on_site(
-                            page, site["site_id"], site["url"],
-                            task, site["answer_substring"], trial,
-                        )
+                        page = await context.new_page()
 
-                    await context.close()
-                    write_run(run, dry_run=args.dry_run, out_path=args.out)
+                        if plan["runner_name"] == "scripted":
+                            run = await run_scripted_extraction(
+                                page, site["site_id"], start_url,
+                                task, site["answer_substring"], trial,
+                            )
+                        else:
+                            run = await run_agent_on_site(
+                                page, site["site_id"], start_url,
+                                task, site["answer_substring"], trial,
+                            )
+
+                        await context.close()
+                        write_run(run, collection=collection,
+                                  dry_run=args.dry_run, out_path=dry_sink)
         finally:
             await browser.close()
 
