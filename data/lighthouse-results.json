@@ -6,7 +6,7 @@
     "lh_layout_stability": 1,
     "lh_llms_txt": 1,
     "lh_webmcp": 0,
-    "run_at": "2026-05-31T09:58:38.985Z"
+    "run_at": "2026-06-01T07:00:05.752Z"
   },
   {
     "site_id": "shopify",
@@ -15,7 +15,7 @@
     "lh_layout_stability": 1,
     "lh_llms_txt": 1,
     "lh_webmcp": 0,
-    "run_at": "2026-05-31T09:59:04.400Z"
+    "run_at": "2026-06-01T07:00:48.160Z"
   },
   {
     "site_id": "github",
@@ -24,16 +24,16 @@
     "lh_layout_stability": 1,
     "lh_llms_txt": 1,
     "lh_webmcp": 0,
-    "run_at": "2026-05-31T09:59:31.851Z"
+    "run_at": "2026-06-01T07:01:17.032Z"
   },
   {
     "site_id": "twilio",
-    "lh_total": 29,
+    "lh_total": 33,
     "lh_accessibility_tree": 0,
     "lh_layout_stability": 0,
     "lh_llms_txt": 0,
     "lh_webmcp": 0,
-    "run_at": "2026-05-31T10:00:42.769Z"
+    "run_at": "2026-06-01T07:35:59.323Z"
   },
   {
     "site_id": "notion",
@@ -42,7 +42,7 @@
     "lh_layout_stability": 1,
     "lh_llms_txt": 0,
     "lh_webmcp": 0,
-    "run_at": "2026-05-31T10:01:08.636Z"
+    "run_at": "2026-06-01T07:03:11.706Z"
   },
   {
     "site_id": "cloudflare",
@@ -51,34 +51,61 @@
     "lh_layout_stability": 1,
     "lh_llms_txt": 1,
     "lh_webmcp": 0,
-    "run_at": "2026-05-31T10:01:42.624Z"
+    "run_at": "2026-06-01T07:03:40.300Z"
+  },
+  {
+    "site_id": "bestbuy",
+    "lh_total": 4,
+    "lh_accessibility_tree": 0,
+    "lh_layout_stability": 0,
+    "lh_llms_txt": 0,
+    "lh_webmcp": 0,
+    "run_at": "2026-06-01T07:04:18.010Z"
+  },
+  {
+    "site_id": "ikea",
+    "lh_total": 50,
+    "lh_accessibility_tree": 0,
+    "lh_layout_stability": 1,
+    "lh_llms_txt": 0,
+    "lh_webmcp": 0,
+    "run_at": "2026-06-01T07:04:38.812Z"
+  },
+  {
+    "site_id": "target",
+    "lh_total": 100,
+    "lh_accessibility_tree": 1,
+    "lh_layout_stability": 1,
+    "lh_llms_txt": 1,
+    "lh_webmcp": 0,
+    "run_at": "2026-06-01T07:05:58.716Z"
   },
   {
     "site_id": "spotify",
+    "lh_total": 29,
+    "lh_accessibility_tree": 0,
+    "lh_layout_stability": 0,
+    "lh_llms_txt": 0,
+    "lh_webmcp": 0,
+    "run_at": "2026-06-01T07:06:24.452Z"
+  },
+  {
+    "site_id": "costco",
+    "lh_total": 98,
+    "lh_accessibility_tree": 1,
+    "lh_layout_stability": 0,
+    "lh_llms_txt": 0,
+    "lh_webmcp": 0,
+    "run_at": "2026-06-01T07:07:18.459Z"
+  },
+  {
+    "site_id": "ca_dmv",
     "lh_total": 67,
     "lh_accessibility_tree": 1,
     "lh_layout_stability": 1,
     "lh_llms_txt": 0,
     "lh_webmcp": 0,
-    "run_at": "2026-05-31T10:04:15.648Z"
-  },
-  {
-    "site_id": "costco",
-    "lh_total": 100,
-    "lh_accessibility_tree": 1,
-    "lh_layout_stability": 1,
-    "lh_llms_txt": 0,
-    "lh_webmcp": 0,
-    "run_at": "2026-05-31T10:04:34.959Z"
-  },
-  {
-    "site_id": "ca_dmv",
-    "lh_total": 46,
-    "lh_accessibility_tree": 1,
-    "lh_layout_stability": 0,
-    "lh_llms_txt": 0,
-    "lh_webmcp": 0,
-    "run_at": "2026-05-31T10:04:54.120Z"
+    "run_at": "2026-06-01T07:07:41.535Z"
   },
   {
     "site_id": "tx_dmv",
@@ -87,7 +114,7 @@
     "lh_layout_stability": 1,
     "lh_llms_txt": 0,
     "lh_webmcp": 0,
-    "run_at": "2026-05-31T10:05:12.750Z"
+    "run_at": "2026-06-01T07:08:03.026Z"
   },
   {
     "site_id": "usps",
@@ -96,16 +123,16 @@
     "lh_layout_stability": 1,
     "lh_llms_txt": 0,
     "lh_webmcp": 0,
-    "run_at": "2026-05-31T10:05:31.299Z"
+    "run_at": "2026-06-01T07:08:24.809Z"
   },
   {
     "site_id": "irs",
-    "lh_total": 39,
+    "lh_total": 50,
     "lh_accessibility_tree": 0,
     "lh_layout_stability": 0,
     "lh_llms_txt": 0,
     "lh_webmcp": 0,
-    "run_at": "2026-05-31T10:05:48.901Z"
+    "run_at": "2026-06-01T07:08:43.945Z"
   },
   {
     "site_id": "ssa",
@@ -114,7 +141,7 @@
     "lh_layout_stability": 1,
     "lh_llms_txt": 0,
     "lh_webmcp": 0,
-    "run_at": "2026-05-31T10:06:06.714Z"
+    "run_at": "2026-06-01T07:09:03.393Z"
   },
   {
     "site_id": "trimet",
@@ -123,43 +150,52 @@
     "lh_layout_stability": 1,
     "lh_llms_txt": 0,
     "lh_webmcp": 0,
-    "run_at": "2026-05-31T10:06:27.866Z"
+    "run_at": "2026-06-01T07:09:24.936Z"
   },
   {
     "site_id": "portland",
-    "lh_total": 69,
-    "lh_accessibility_tree": 1,
-    "lh_layout_stability": 0,
-    "lh_llms_txt": 0,
-    "lh_webmcp": 0,
-    "run_at": "2026-05-31T10:06:45.050Z"
-  },
-  {
-    "site_id": "oregon_state",
-    "lh_total": 49,
-    "lh_accessibility_tree": 0,
-    "lh_layout_stability": 0,
-    "lh_llms_txt": 0,
-    "lh_webmcp": 0,
-    "run_at": "2026-05-31T10:07:06.242Z"
-  },
-  {
-    "site_id": "voodoo",
-    "lh_total": 50,
-    "lh_accessibility_tree": 0,
-    "lh_layout_stability": 1,
-    "lh_llms_txt": 0,
-    "lh_webmcp": 0,
-    "run_at": "2026-05-31T10:07:34.822Z"
-  },
-  {
-    "site_id": "innout",
     "lh_total": 100,
     "lh_accessibility_tree": 1,
     "lh_layout_stability": 1,
     "lh_llms_txt": 0,
     "lh_webmcp": 0,
-    "run_at": "2026-05-31T10:07:57.936Z"
+    "run_at": "2026-06-01T07:09:45.977Z"
+  },
+  {
+    "site_id": "oregon_state",
+    "lh_total": 50,
+    "lh_accessibility_tree": 0,
+    "lh_layout_stability": 1,
+    "lh_llms_txt": 0,
+    "lh_webmcp": 0,
+    "run_at": "2026-06-01T07:10:06.262Z"
+  },
+  {
+    "site_id": "powells",
+    "lh_total": 3,
+    "lh_accessibility_tree": 0,
+    "lh_layout_stability": 0,
+    "lh_llms_txt": 0,
+    "lh_webmcp": 0,
+    "run_at": "2026-06-01T07:10:30.936Z"
+  },
+  {
+    "site_id": "voodoo",
+    "lh_total": 100,
+    "lh_accessibility_tree": 1,
+    "lh_layout_stability": 1,
+    "lh_llms_txt": 0,
+    "lh_webmcp": 0,
+    "run_at": "2026-06-01T07:10:56.274Z"
+  },
+  {
+    "site_id": "innout",
+    "lh_total": 28,
+    "lh_accessibility_tree": 0,
+    "lh_layout_stability": 0,
+    "lh_llms_txt": 0,
+    "lh_webmcp": 0,
+    "run_at": "2026-06-01T07:11:16.255Z"
   },
   {
     "site_id": "bear",
@@ -168,7 +204,7 @@
     "lh_layout_stability": 0,
     "lh_llms_txt": 0,
     "lh_webmcp": 0,
-    "run_at": "2026-05-31T10:08:20.782Z"
+    "run_at": "2026-06-01T07:11:38.738Z"
   },
   {
     "site_id": "apple",
@@ -177,15 +213,33 @@
     "lh_layout_stability": 1,
     "lh_llms_txt": 0,
     "lh_webmcp": 0,
-    "run_at": "2026-05-31T10:08:46.641Z"
+    "run_at": "2026-06-01T07:12:01.809Z"
   },
   {
     "site_id": "craigslist",
-    "lh_total": 100,
-    "lh_accessibility_tree": 1,
+    "lh_total": 24,
+    "lh_accessibility_tree": 0,
+    "lh_layout_stability": 0,
+    "lh_llms_txt": 0,
+    "lh_webmcp": 0,
+    "run_at": "2026-06-01T07:12:21.658Z"
+  },
+  {
+    "site_id": "amazon",
+    "lh_total": 50,
+    "lh_accessibility_tree": 0,
     "lh_layout_stability": 1,
     "lh_llms_txt": 0,
     "lh_webmcp": 0,
-    "run_at": "2026-05-31T10:09:04.384Z"
+    "run_at": "2026-06-01T07:12:51.285Z"
+  },
+  {
+    "site_id": "ticketmaster",
+    "lh_total": 50,
+    "lh_accessibility_tree": 0,
+    "lh_layout_stability": 1,
+    "lh_llms_txt": 0,
+    "lh_webmcp": 0,
+    "run_at": "2026-06-01T07:13:28.889Z"
   }
 ]
