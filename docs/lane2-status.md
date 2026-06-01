@@ -2,49 +2,71 @@
 
 _Updated 2026-05-31 · Branch: `harness`_
 
-Human-readable handoff. (The AI assistant's session memory also persists, so a fresh chat
-picks up with full context — just say "continue Lane 2".)
+Human-readable handoff. Session memory also persists, so a fresh chat picks up with full
+context — say **"continue Lane 2"**. **Pick-up instructions for the next chat are at the bottom.**
 
-## ✅ Done (committed on `harness`)
+## Where we are (big picture)
 
-- **Harness hardened + frozen** (`2edc2f4`): raw-bytes image, JSON mode + retry, de-masked errors, empty-substring guard, 3-identical-actions loop-breaker, `--dry-run`/`--out`, UTF-8 stdout, browser try/finally, 5s fill timeout.
-- **`--resume`** (`7872c12`): crash-safe re-runs (skip-if-exists on doc id), proven.
-- **Firebase wired + verified**: `service-account.json` + `GOOGLE_APPLICATION_CREDENTIALS`; write/read/delete to `agentrank-quackhacks` OK.
-- **Cohort brief delivered** (`docs/cohort-redesign-brief.md`), and **cohort received back from Member 4** → `scripts/cohort-source/` (28 sites: `agentrank_sites.csv` + `agentrank_cohort.md` + `agentrank_scoring_rules.md`). Strong: pre-registered discriminating answers, off-diagonal picks, 2 blockers.
+The experiment is **end-to-end on real data**, locally. We have:
+- a **27-site cohort** (Member 4's homepages + answer keys; zalando dropped),
+- a frozen **measure-both harness** (homepage navigation → `runs`; deep-link extraction → `runs_extraction`),
+- a pre-registered **scorer** (275/275),
+- **real Lighthouse x-axis** + **real agent y-axis** data,
+- a **frontend that builds green reading real Firestore data**.
 
-## ✅ Scorer upgrade (#1) — DONE this session (UNCOMMITTED)
+Headline so far: **Lighthouse weakly predicts agent navigation success** (Spearman ρ ≈ 0.25–0.3, thin n) — the "the static rubric doesn't reliably predict real agent behavior" story, with strong off-diagonal cases.
 
-The pre-registered scoring contract is now implemented and adversarially verified.
+## ✅ Done + committed (on `harness`)
 
-- **New `scripts/scorer.py`** — pure stdlib (`re`, `decimal`); NO google/playwright/firebase imports, never raises, blank registered → `False`. `score_answer(agent_answer, answer_substring) -> bool` implements `agentrank_scoring_rules.md`: any-of (split `" | "`); strip `$`/`€`/`£`; **numeric word-boundary** via maximal-number-run **Decimal-value** match (`$20`≠`$200`, `67`≠`1967`/`26.67%`); trailing `.00`/zeros and US thousands-commas handled for free; Zalando comma-as-decimal (`69,95`); percent / time / phrase / phone(≥7-digit) / literal classifiers.
-- **`scripts/test_scorer.py`** — self-contained runner, **275/275 pass** (`python scripts/test_scorer.py`).
-- **Wired into `scripts/lane2-agent.py`** — 3-line diff (1 import + the two `success = score_answer(answer, answer_substring)` sites). FROZEN config, the `failure_mode` enum, and every `answer_substring` are untouched; both empty-substring guards kept.
-- **Adversarially reviewed** (8-agent workflow: 3 test-authors → implementer → 4 reviewers that ran the suite). Contract reviewer **PASS, 0 violations**; false-negative reviewer **no defects**. Fixed 2 confirmed over-matches: TIME colon-boundary (`4:30`≠`4:30:15`) and NUMBER-PHRASE right-boundary (`90 days`≠`90 dayschallenge`) — both align with those rows' `match_rule` ("exact"/"exact phrase").
-- **Flags for Member 4** (pre-registered scoring — I did NOT change these): test `notion_neg_3` was mislabeled (`$12` *does* match "$12x12 = $144" by the value-presence rule); LITERAL is substring per "case-normalize" so `DevHub`⊂`DevHubbed` / `Isakov`⊂`Isakovich` match (pinned with a test; tightening is their call); out-of-contract by current rules → phone embedded-digit, word-form numerals ("ninety"), space-grouped thousands ("15 750"), euro-comma percent ("2,9%").
-- ⚠️ A review agent also added `.claude/settings.local.json` to `.gitignore` (correct hygiene, but unrequested) — keep or drop before committing.
+- **Scorer** `scripts/scorer.py` + `test_scorer.py` (275/275), pre-registered contract.
+- **Cohort pipeline** `build-cohort.py` → `cohort.json` (**27 sites**; Member 4 fixes applied: 5 product URLs filled, zalando dropped, oregon_state→`16014`; notion `$12` / target `12.89` confirmed unchanged).
+- **measure-both harness** (`--mode navigation|extraction|both`): homepage nav → `runs`, deep-link scripted → `runs_extraction`; `homepage` auto-derived.
+- **Frozen** at `MAX_STEPS=20 / TIMEOUT=120` (after the homepage re-gate).
+- **Crash fix** — Gemini multi-action JSON arrays no longer abort the run (executes the first action).
+- **Lane 1** audit-IDs corrected + Windows EPERM salvage + offline JSON fallback + **`--homepage` flag** (score the homepage, not the deep-link).
+- **Lane 3** Spearman ρ + bootstrap CI + visible n; fixed the silent fake-data gate; partial-data guards.
+- **`push-to-firestore.py`** — idempotent `--write` pusher (runs / runs_extraction / lighthouse).
+- **`PREREG.md`** (draft, pending Member 4 ratify), `docs/member4-cohort-fixes.md` handoff, STATUS/FUTURE updates.
+- **Real data ran + pushed earlier:** 22-site measure-both + 21-site Lighthouse → Firestore; frontend verified REAL.
 
-## ⛔ Still before the full run
+## ⚠️ Current dataset state (IMPORTANT — mid-refresh)
 
-**From Member 4** — fill the **6 placeholder URLs** (`[confirm …]`): `bestbuy`, `ikea`, `powells`, `zalando`, `amazon`, `ticketmaster` (exact product/event pages); plus the scorer flags above.
+The cohort + agent runs were just refreshed, so **Firestore is now STALE vs the local files**:
+- **Local (current, correct):** `lane2-runs.jsonl` (135 nav) + `lane2-runs-extraction.jsonl` (135 ext) = **all 27 sites**, with the corrected oregon_state + the 5 new sites. *(gitignored; live on disk.)*
+- **Firestore (stale):** old 22-site runs (oregon_state scored against the wrong key), no runs for the 5 new sites, an orphan `zalando` site doc.
+- **Lighthouse (stale):** `data/lighthouse-results.json` has 21 sites scored on the **deep-link** pages → must be re-run on **homepages**.
 
-**On the harness (the fresh-chat work, in order):**
-1. ~~**Upgrade the scorer**~~ ✅ **DONE** (above).
-2. ~~**Convert** CSV → `scripts/cohort.json` (#3)~~ ✅ **DONE** — `scripts/build-cohort.py` (pure stdlib, re-runnable) generates the canonical **28-site** `cohort.json` from `agentrank_sites.csv`: maps `start_url`→`url` (deep links kept verbatim), carries `question`/`task_hint`/`match_rule`/`flag`/`tier`/`runnable`, renames ids (`dmv_ca`→`ca_dmv`, `irs_gov`→`irs`), marks the 6 `[confirm…]` rows `runnable:false`, and **hard-asserts no answer leak** into `question`/`task_hint`. A skip-guard in `lane2-agent.py` skips non-runnable/placeholder rows so the harness never `goto()`s a placeholder. ⚠️ **Cross-lane:** the `site_id` renames + drop-to-28 affect `seed-sites.ts`, Lane 1 keys, Lane 3 joins — re-run `npm run seed:sites` once finalized. *(Uncommitted.)*
-3. **Per-site question** (#2) — feed each site's leak-free `question` to the agent (replace the generic "primary product/service" `TASK_TEMPLATE`, wrong for gov/info pages). **Behavioral → reopens the freeze; needs a live `GEMINI_API_KEY` re-gate + your sign-off.** *(Not yet started — gated on you.)*
-4. **Re-gate** (#4) a few new sites (a gov + an off-diagonal), then re-freeze.
+## ⏭️ NEXT STEPS (in order — start here in the new chat)
 
-**Also blocking the run (your/Member 4's call):** the **deep-link vs homepage** decision — the cohort URLs are deep links that land on the answer page (~1-step extraction, not navigation). Either rewrite to homepages or consciously re-scope to "extraction reliability."
+1. **Re-run Lighthouse on the 27 homepages** (approved x-axis fix; also covers the 5 new sites):
+   ```
+   npx tsx scripts/lane1-lighthouse.ts --homepage
+   ```
+   → writes `data/lighthouse-results.json` (local fallback; ~20–25 min; needs Chrome — it's installed).
+2. **Clean re-push to Firestore** (overwrites stale data):
+   ```
+   python scripts/push-to-firestore.py --write
+   $env:GOOGLE_APPLICATION_CREDENTIALS="service-account.json"; npm run seed:sites
+   ```
+   Then **delete the orphan `zalando` doc** from `sites` (seeded with the old 28). The pusher only `.set()`-overwrites — it does NOT delete, so also remove any stale `lighthouse` docs for sites that fail the homepage re-run.
+3. **Re-compute the final correlation** on the aligned set (27 sites, homepage-Lighthouse vs homepage-navigation). Update the headline number + the off-diagonal picks from the real values.
+4. **Verify the live frontend** (`npm run build` → "data mode: REAL", scatter renders the refreshed data).
 
-## Then
+## Then (finish line)
 
-- **Full run** (28×5 → Firestore; Firebase ✓), then sanity-check 0/5 & perfect sites (#9–10). Re-verify volatile prices (amazon/bestbuy/ikea/zalando) right before.
-- **#6 blocked-before-task rule** — verify `BLOCKED` fires on amazon/ticketmaster (folds in naturally now).
+- **Deploy to a public `.tech` URL** — human: `firebase login` + Blaze billing + domain; set `FIREBASE_SERVICE_ACCOUNT_JSON` **inline** in the hosting backend (a missing var silently serves fake data).
+- **Member 4** still owes: ratify `PREREG.md`; optionally treat notion's monthly-toggle + target's anti-bot as documented findings.
+- **Investigate `costco`** nav `error` (technical, read the transcript) if time.
+- Rehearse the 2-min demo (surprising-case click-through).
 
-## Parallel / other lanes
+## Findings / caveats for the writeup
 
-- **Lane 1** Lighthouse scoring (x-axis) — independent, runnable now.
-- **Lane 3** frontend builds on fake data → wire to real `runs` after the run; `npm run seed:sites` once `cohort.json` is final.
+- **Off-diagonal:** high-Lighthouse sites that FAIL navigation (ssa, tx_dmv, costco); low-Lighthouse that SUCCEED (bear). The rubric doesn't separate them.
+- **measure-both gap:** extraction (~0.8) ≫ navigation (~0.5) — agents read better than they navigate.
+- **Genuinely hard (real failures, not bugs):** oregon_state (accordion), notion (monthly price behind a toggle), target (anti-bot), bestbuy (anti-bot), the 2 blockers (amazon/ticketmaster).
+- **Thin n** (~20 with Lighthouse) → report as "no reliable relationship"; show Spearman + CI + n.
 
 ## Resuming in a new chat
 
-Scorer (#1) **and** the CSV→`cohort.json` converter (#3) are both **done** (working tree, **not committed**). Key files: `scripts/scorer.py` + `scripts/test_scorer.py` (`python scripts/test_scorer.py` → 275/275), `scripts/build-cohort.py` → `scripts/cohort.json` (28 sites). **Remaining is mostly gated on you/the team:** the **deep-link-vs-homepage decision**, the **6 `[confirm…]` URLs** (Member 4), then **#2 per-site question + #4 re-gate** (behavioral, needs a live `GEMINI_API_KEY`), `PREREG.md` ratify+commit (Member 4), then the **full run**. To continue the harness coding once those land, say **"continue Lane 2 — wire the per-site question + re-gate."**
+Say **"continue Lane 2 — re-run Lighthouse on the homepages and finish the data refresh."**
+Everything is committed; the agent runs are on disk in `lane2-runs*.jsonl`. Start at **NEXT STEP #1**.
