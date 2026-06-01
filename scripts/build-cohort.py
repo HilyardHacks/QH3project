@@ -42,7 +42,7 @@ HERE = Path(__file__).resolve().parent
 CSV_PATH = HERE / "cohort-source" / "agentrank_sites.csv"
 OUT_PATH = HERE / "cohort.json"
 
-EXPECTED_ROWS = 28
+EXPECTED_ROWS = 27  # zalando dropped (region-unavailable)
 PLACEHOLDER_MARKER = "[confirm"
 
 
