@@ -76,6 +76,7 @@ interface CohortEntry {
   name: string;
   tier: string;
   url: string;
+  homepage: string;
   question: string;
   task_hint: string;
   answer_substring: string;
@@ -273,7 +274,12 @@ function writeLocalResults(results: LighthouseResult[]): void {
 // ---------------------------------------------------------------------------
 
 async function main() {
-  const args = process.argv.slice(2);
+  const rawArgs = process.argv.slice(2);
+  // --homepage scores each site's HOMEPAGE (site.homepage) instead of the deep-link
+  // answer page (site.url), so the x-axis (Lighthouse) matches the agent's homepage
+  // start in the navigation condition. Default stays site.url for back-compat.
+  const useHomepage = rawArgs.includes("--homepage");
+  const args = rawArgs.filter((a) => !a.startsWith("--"));
   const targetIds = args.length > 0 ? new Set(args) : null;
   const sites = targetIds
     ? cohort.filter((s) => targetIds.has(s.site_id))
@@ -287,6 +293,7 @@ async function main() {
   const useFirestore = hasFirebaseCreds();
   console.log(`\nLane 1 — Lighthouse runner`);
   console.log(`Sites to process: ${sites.length}`);
+  console.log(`Scoring page: ${useHomepage ? "HOMEPAGE (site.homepage)" : "deep-link (site.url)"}`);
   console.log(`Sink: ${useFirestore ? "Firestore" : `local JSON (${LOCAL_RESULTS_PATH})`}`);
   console.log(`----------------------------------`);
 
@@ -296,7 +303,8 @@ async function main() {
   for (const site of sites) {
     console.log(`\n[${site.site_id}] ${site.name}`);
 
-    const outcome = await runLighthouse(site.url);
+    const target = useHomepage && site.homepage ? site.homepage : site.url;
+    const outcome = await runLighthouse(target);
     if (outcome.status === "FAILED") {
       console.error(`  ✗ FAILED: ${outcome.reason}`);
       results.push({ site_id: site.site_id, status: "FAILED", reason: outcome.reason });
