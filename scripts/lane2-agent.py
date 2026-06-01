@@ -91,16 +91,16 @@ from firebase_admin import credentials, firestore
 #   3-identical-actions loop-breaker. Pure bug fixes that don't change what the
 #   agent sees or does are fine; anything behavioral is not.
 #
-# FREEZE REOPENED 2026-05-31 for the "measure both" / homepage-start navigation change:
-# MAX_STEPS and TIMEOUT_SECONDS were RAISED (15->25, 90->150) to give the agent room to
-# browse from a site's HOMEPAGE (the old gate used deep-link starts that landed on the
-# answer page in ~1 step). These two values are PROVISIONAL — confirm them against the
-# observed step counts / timeouts in the homepage re-gate (5 sites, `--mode both`), then
-# RE-FREEZE before the full cohort run. Everything else above is unchanged.
+# RE-FROZEN 2026-05-31 after the homepage re-gate (5 sites, `--mode both`): from a HOMEPAGE
+# start the full agent terminated at avg 3.2 / max 7 steps — never near the cap; the failures
+# were loop-breaker `navigation_stuck`, not step exhaustion. So MAX_STEPS / TIMEOUT_SECONDS are
+# set to 20 / 120 — ample headroom (~3x the observed max) for deeper sites in the full cohort,
+# without inflating cost (the agent terminates early regardless). These are FROZEN for the
+# cohort run. (The original deep-link gate used 15 / 90.)
 
 GEMINI_MODEL = "gemini-2.0-flash"      # fast, cheap, multimodal
-MAX_STEPS = 25         # raised from 15 for homepage-start navigation (provisional; re-gate)
-TIMEOUT_SECONDS = 150  # raised from 90 to match the higher step budget (provisional; re-gate)
+MAX_STEPS = 20         # frozen for homepage navigation (re-gate: avg 3.2 / max 7 steps)
+TIMEOUT_SECONDS = 120  # frozen; wall-clock cap matched to the step budget
 DEFAULT_TRIALS = 5
 
 TASK_TEMPLATE = (
