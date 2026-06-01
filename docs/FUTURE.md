@@ -38,6 +38,13 @@ Commit the answer key as a timestamped, git-hashed artifact **before** any run a
 ### Cross-agent replication
 Swap Gemini → Claude/GPT behind the *identical* loop to get a second success-rate column. Tests whether Lighthouse predicts **agents in general** or just Gemini — upgrades the claim from "Gemini behaves this way" to "agents behave this way."
 
+### Generational replication — does navigability matter *more or less* as agents improve?
+Run the **identical frozen cohort/task/scorer** across the whole **Flash family** (1.5 Flash → 2.0 Flash → 2.5 Flash → Flash-Lite → future Flash) via a single `--model` flag, and compute the Lighthouse↔success correlation **per model generation**. Holding the family constant **isolates one variable — capability over time** — which the cross-provider study can't. The headline question: *as Flash models get smarter, does the static "agent-readiness" rubric predict success more or less?*
+- **Correlation decays across generations** → smarter agents power through badly-built sites, so a static readiness rubric is a **moving target that ages out** — a spicy, contrarian finding.
+- **Correlation holds** → navigability is a fundamental site property that gates **every** generation → the rubric is **durable**, which validates Google's premise.
+
+The deliverable is a **meta-scatter**: x = model generation, y = predictiveness (correlation strength). One picture answers "is agent-readiness scoring future-proof?" Nearly free to run (shared API/vision/price tier; only `GEMINI_MODEL` varies). Caveat: a model that aces or fails *everything* has no spread → its correlation is undefined, and that ceiling/floor is itself a data point ("this generation is past the discriminating zone"). Pairs naturally with the measure-both `gap` (navigation vs extraction) — you can track whether the **navigation gap's** predictiveness specifically rises or falls per generation.
+
 ### Report back to the Lighthouse / Chrome team
 Package the sub-audit analysis (per-audit Spearman + CI vs. measured success) as a GitHub issue/discussion on the Lighthouse repo, with our dataset linked. This is the **first external validation of Google's own audit** — the cleanest sponsor-track narrative ("we validated Google's rubric") and reframes us from "cute leaderboard" to "empirical contribution."
 
