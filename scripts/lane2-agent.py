@@ -272,7 +272,19 @@ async def ask_gemini(task: str, screenshot_bytes: bytes, accessible_text: str,
             if not text:
                 last_problem = f"empty response ({_response_reason(response)})"
             else:
-                return json.loads(text)
+                parsed = json.loads(text)
+                if isinstance(parsed, dict):
+                    return parsed
+                # Despite the "single best next action" instruction + JSON mode, Gemini
+                # sometimes returns a JSON ARRAY — a 1-element envelope [{...}] or a multi-step
+                # PLAN [{...},{...}]. Execute the FIRST action and re-observe next step (the loop
+                # re-plans from the new state). This (a) stops a list response from CRASHING the
+                # whole run — it aborted on tx_dmv: 'list' object has no attribute 'get' — and
+                # (b) preserves the trial instead of discarding it as 'error'. Any other
+                # non-object shape stays unparseable -> retry, then the __error__ sentinel.
+                if isinstance(parsed, list) and parsed and isinstance(parsed[0], dict):
+                    return parsed[0]
+                last_problem = f"non-object JSON ({type(parsed).__name__}): {text[:120]!r}"
         except Exception as e:
             snippet = (text[:120] + "…") if text else ""
             last_problem = f"{e}" + (f" | body: {snippet!r}" if snippet else "")
