@@ -3,6 +3,13 @@
 // Lanes 1 & 2 replace them with real data.
 
 import { Site, LighthouseResult, Run, SiteLeaderboardEntry, CorrelationPoint } from "./types";
+import { wilsonCI } from "./stats";
+
+// Wilson CI as {ci_low, ci_high} for the leaderboard literals below.
+const lbCi = (successes: number, trials: number) => {
+  const c = wilsonCI(successes, trials);
+  return { ci_low: c.lo, ci_high: c.hi };
+};
 
 export const FAKE_SITES: Site[] = [
   {
@@ -96,6 +103,8 @@ export const FAKE_LEADERBOARD: SiteLeaderboardEntry[] = [
     trial_count: 5,
     mean_steps: 4,
     top_failure_mode: "wrong_extraction",
+    ...lbCi(4, 5),
+    trial_results: [true, true, true, false, true],
     rank: 1,
   },
   {
@@ -111,6 +120,8 @@ export const FAKE_LEADERBOARD: SiteLeaderboardEntry[] = [
     trial_count: 5,
     mean_steps: 10.6,
     top_failure_mode: "timeout",
+    ...lbCi(2, 5),
+    trial_results: [true, false, false, true, false],
     rank: 2,
   },
   {
@@ -126,6 +137,8 @@ export const FAKE_LEADERBOARD: SiteLeaderboardEntry[] = [
     trial_count: 5,
     mean_steps: 12.8,
     top_failure_mode: "timeout",
+    ...lbCi(1, 5),
+    trial_results: [false, false, true, false, false],
     rank: 3,
   },
 ];

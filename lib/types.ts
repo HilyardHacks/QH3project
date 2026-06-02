@@ -52,6 +52,9 @@ export interface SiteLeaderboardEntry {
   trial_count: number;
   mean_steps: number;
   top_failure_mode: FailureMode;
+  ci_low: number;            // Wilson 95% CI lower bound on success_rate
+  ci_high: number;           // Wilson 95% CI upper bound on success_rate
+  trial_results: boolean[];  // per-trial success, ordered by trial_number (for the dot-strip)
   rank: number;
 }
 
