@@ -135,6 +135,10 @@ export const FAKE_CORRELATION_POINTS: CorrelationPoint[] = FAKE_LEADERBOARD.map(
   name: e.name,
   lh_total: e.lh_total ?? 0,
   success_rate: e.success_rate,
+  trial_count: e.trial_count,
+  top_failure_mode: e.top_failure_mode,
+  // ci_low/ci_high omitted on purpose: importing wilsonCI from ./queries here would be a
+  // circular import (queries imports this file). The tooltip degrades gracefully without them.
   lh_accessibility_tree: e.lh_accessibility_tree ?? 0,
   lh_layout_stability: e.lh_layout_stability ?? 0,
   lh_llms_txt: e.lh_llms_txt ?? 0,

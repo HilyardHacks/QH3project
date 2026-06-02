@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import Link from "next/link";
 import {
   getCorrelationPoints,
@@ -29,6 +30,17 @@ export default async function CorrelationPage() {
   // correlations (ρ = ±1) or tiny n, which can read as false certainty — flag it.
   const ciUnreliable = n < 5 || ci.lo === ci.hi;
   const { slope, intercept } = linearRegression(xyPairs);
+
+  // Title-as-claim (move 1): the headline asserts the finding instead of asking a question.
+  // Tone tracks |r| so it stays honest if the data shifts — weak |r| ⇒ the contrarian claim.
+  const claim =
+    n < 2
+      ? "Not enough joined data yet"
+      : Math.abs(r) >= 0.7
+      ? "Google's rubric predicts agent success"
+      : Math.abs(r) >= 0.4
+      ? "Google's rubric only partly predicts agent success"
+      : "Google's rubric barely predicts agent success";
 
   // Sub-audit correlation: which single audit best predicts success?
   const subAudits = [
@@ -77,17 +89,31 @@ export default async function CorrelationPage() {
 
       <div className="mb-8">
         <h1 className="text-3xl font-bold text-slate-900 mb-2">
-          Does Google's rubric predict agent success?
+          {claim}{" "}
+          <span className="text-slate-400 font-semibold tabular-nums">
+            — ρ&nbsp;=&nbsp;{rho.toFixed(2)}, n&nbsp;=&nbsp;{n}
+          </span>
         </h1>
-        <p className="text-slate-500 max-w-2xl">
-          Each point is one site. The x-axis is Google's Lighthouse Agentic Browsing score; the y-axis is the measured
-          success rate of a fixed Gemini agent completing a real task. The dashed line is a least-squares fit.
+        <p className="text-sm text-slate-500 max-w-2xl">
+          Each point is one site. x = Google&apos;s Lighthouse Agentic Browsing score (scored on the
+          homepage); y = the measured success rate of a fixed Gemini agent completing a real task. The
+          dashed line is a least-squares fit; the tinted corners flag where the static rubric and real
+          agent behavior disagree.
         </p>
       </div>
 
-      {/* The scatter chart */}
+      {/* The scatter chart — Suspense wraps the client chart because it reads ?focus via
+          useSearchParams (App Router requires a boundary for static rendering). */}
       <div className="bg-white rounded-xl border border-slate-200 p-6 mb-8">
-        <CorrelationChart points={points} slope={slope} intercept={intercept} r={r} rho={rho} ci={ci} n={n} />
+        <Suspense
+          fallback={
+            <div className="flex h-[460px] items-center justify-center text-sm text-slate-400">
+              Loading chart…
+            </div>
+          }
+        >
+          <CorrelationChart points={points} slope={slope} intercept={intercept} r={r} rho={rho} ci={ci} n={n} />
+        </Suspense>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">

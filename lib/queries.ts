@@ -128,16 +128,49 @@ export async function getCorrelationPoints(): Promise<CorrelationPoint[]> {
   const entries = await getLeaderboard();
   return entries
     .filter((e) => e.lh_total !== null)
-    .map((e) => ({
-      site_id: e.site_id,
-      name: e.name,
-      lh_total: e.lh_total!,
-      success_rate: e.success_rate,
-      lh_accessibility_tree: e.lh_accessibility_tree ?? 0,
-      lh_layout_stability: e.lh_layout_stability ?? 0,
-      lh_llms_txt: e.lh_llms_txt ?? 0,
-      lh_webmcp: e.lh_webmcp ?? 0,
-    }));
+    .map((e) => {
+      // success_rate * trial_count is the integer success count; round to defuse float drift.
+      const successes = Math.round(e.success_rate * e.trial_count);
+      const ci = wilsonCI(successes, e.trial_count);
+      return {
+        site_id: e.site_id,
+        name: e.name,
+        lh_total: e.lh_total!,
+        success_rate: e.success_rate,
+        trial_count: e.trial_count,
+        top_failure_mode: e.top_failure_mode,
+        ci_low: ci.lo,
+        ci_high: ci.hi,
+        lh_accessibility_tree: e.lh_accessibility_tree ?? 0,
+        lh_layout_stability: e.lh_layout_stability ?? 0,
+        lh_llms_txt: e.lh_llms_txt ?? 0,
+        lh_webmcp: e.lh_webmcp ?? 0,
+      };
+    });
+}
+
+// ---------------------------------------------------------------------------
+// Wilson 95% score interval for a binomial proportion (successes / trials).
+// ---------------------------------------------------------------------------
+// Per-site success-rate uncertainty for the scatter tooltip and (next PR) the
+// leaderboard + error bars. This is NOT the scatter's correlation CI — that stays
+// the deterministic bootstrap above. Pure, dependency-free, clamped to [0, 1].
+// trials === 0 → the maximally-uncertain {lo: 0, hi: 1}.
+export function wilsonCI(
+  successes: number,
+  trials: number,
+  z = 1.959963984540054 // 95%
+): { lo: number; hi: number } {
+  if (trials <= 0) return { lo: 0, hi: 1 };
+  const p = successes / trials;
+  const z2 = z * z;
+  const denom = 1 + z2 / trials;
+  const center = p + z2 / (2 * trials);
+  const margin = z * Math.sqrt((p * (1 - p) + z2 / (4 * trials)) / trials);
+  return {
+    lo: Math.max(0, (center - margin) / denom),
+    hi: Math.min(1, (center + margin) / denom),
+  };
 }
 
 // ---------------------------------------------------------------------------

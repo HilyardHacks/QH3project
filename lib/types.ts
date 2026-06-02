@@ -61,6 +61,10 @@ export interface CorrelationPoint {
   name: string;
   lh_total: number;
   success_rate: number;
+  trial_count: number;            // # agent trials backing success_rate (the "n" per point)
+  top_failure_mode: FailureMode;  // dominant non-success mode — drives dot color + tooltip
+  ci_low?: number;                // Wilson 95% CI lower bound on success_rate (optional)
+  ci_high?: number;               // Wilson 95% CI upper bound on success_rate (optional)
   // sub-audits for the "which audit matters" analysis
   lh_accessibility_tree: number;
   lh_layout_stability: number;
