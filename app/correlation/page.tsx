@@ -9,6 +9,7 @@ import {
   linearRegression,
 } from "@/lib/queries";
 import CorrelationChart from "@/components/CorrelationChart";
+import InfoLink from "@/components/InfoLink";
 
 // Manual override for the "most interesting data point" callout. When set to a
 // site_id string, that site is pinned as the surprising case (e.g. to feature a
@@ -186,7 +187,7 @@ export default async function CorrelationPage() {
             }
           </p>
           <p className="text-sm text-slate-400 mt-3 font-mono">
-            Pearson r&nbsp;=&nbsp;{r.toFixed(2)} · Spearman ρ&nbsp;=&nbsp;{rho.toFixed(2)} · 95% CI&nbsp;[{ci.lo.toFixed(2)},&nbsp;{ci.hi.toFixed(2)}]{ciUnreliable ? " (CI unreliable at this n)" : ""} · n&nbsp;=&nbsp;{n}
+            Pearson r&nbsp;=&nbsp;{r.toFixed(2)} · Spearman ρ&nbsp;=&nbsp;{rho.toFixed(2)} · 95% CI&nbsp;[{ci.lo.toFixed(2)},&nbsp;{ci.hi.toFixed(2)}]{ciUnreliable ? " (CI unreliable at this n)" : ""} · n&nbsp;=&nbsp;{n}<InfoLink anchor="limitations" label="Limitations & sample size" />
           </p>
         </div>
       ) : (
@@ -201,7 +202,8 @@ export default async function CorrelationPage() {
 
       {/* Methodology note */}
       <p className="text-xs text-slate-400 mt-6 max-w-2xl">
-        <span className="font-semibold text-slate-500">Methodology:</span>{" "}
+        <span className="font-semibold text-slate-500">Methodology:</span>
+        <InfoLink anchor="scoring" label="Scoring rule" />{" "}
         Scoring is pre-registered case-insensitive substring matching, fixed before any agent runs.
         Cohort n&nbsp;=&nbsp;{n} joined sites (those with a Lighthouse score). Reported correlations are
         Pearson r and Spearman ρ; the 95% confidence interval is a deterministic seeded bootstrap

@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getSiteDetail } from "@/lib/queries";
 import { Run } from "@/lib/types";
+import InfoLink from "@/components/InfoLink";
 
 function SubAuditRow({ label, value }: { label: string; value: number | null }) {
   if (value === null) return null;
@@ -147,7 +148,10 @@ export default async function SiteDetailPage({ params }: { params: { slug: strin
 
       {/* Pre-registered answer */}
       <div className="bg-amber-50 border border-amber-200 rounded-xl p-5 mb-8">
-        <h2 className="font-semibold text-amber-900 mb-1">Pre-registered scoring key</h2>
+        <h2 className="font-semibold text-amber-900 mb-1">
+          Pre-registered scoring key
+          <InfoLink anchor="scoring" label="How scoring works" />
+        </h2>
         <p className="text-sm text-amber-700">
           <span className="font-medium">Expected answer substring:</span>{" "}
           <code className="bg-amber-100 px-1.5 py-0.5 rounded font-mono text-amber-800">{site.answer_substring}</code>

@@ -2,6 +2,7 @@ import { Suspense } from "react";
 import Link from "next/link";
 import { getLeaderboard } from "@/lib/queries";
 import Leaderboard from "@/components/Leaderboard";
+import InfoLink from "@/components/InfoLink";
 
 export default async function LeaderboardPage() {
   const entries = await getLeaderboard();
@@ -65,7 +66,7 @@ export default async function LeaderboardPage() {
       </Suspense>
 
       <p className="text-xs text-slate-400 mt-4 text-center">
-        Scoring is pre-registered exact-match, decided before any agent runs. Behavioral results use Gemini (fixed model + prompt).
+        Scoring is a pre-registered substring match, decided before any agent runs.<InfoLink anchor="scoring" /> Behavioral results use Gemini (fixed model + prompt).
         Static scores use{" "}
         <a href="https://developer.chrome.com/docs/lighthouse" target="_blank" rel="noreferrer" className="underline">
           Lighthouse 13.3 Agentic Browsing category

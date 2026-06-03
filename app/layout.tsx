@@ -24,6 +24,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               <Link href="/correlation" className="hover:text-slate-900 transition-colors">
                 Correlation
               </Link>
+              <Link href="/methodology" className="hover:text-slate-900 transition-colors">
+                Methodology
+              </Link>
             </nav>
           </div>
         </header>
