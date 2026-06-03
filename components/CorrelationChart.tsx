@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import {
   ScatterChart,
@@ -205,6 +205,97 @@ export default function CorrelationChart({ points, slope, intercept, r, rho, ci,
     [activeMode, focused]
   );
 
+  // ----- move 14: per-chart export toolbar (Download PNG + Copy link) -----
+  const chartRef = useRef<HTMLDivElement>(null);
+  const [copyState, setCopyState] = useState<"idle" | "copied" | "error">("idle");
+  const [pngState, setPngState] = useState<"idle" | "working" | "done" | "error">("idle");
+  // Separate reset timers per control so one action's reset can't clobber the other's pending one.
+  const copyTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pngTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(
+    () => () => {
+      if (copyTimer.current) clearTimeout(copyTimer.current);
+      if (pngTimer.current) clearTimeout(pngTimer.current);
+    },
+    []
+  );
+  const scheduleReset = useCallback(
+    (ref: { current: ReturnType<typeof setTimeout> | null }, reset: () => void, ms: number) => {
+      if (ref.current) clearTimeout(ref.current);
+      ref.current = setTimeout(reset, ms);
+    },
+    []
+  );
+
+  const handleDownload = useCallback(async () => {
+    const node = chartRef.current;
+    if (!node) return; // clicked before mount
+    setPngState("working");
+    try {
+      // Explicit dims (not a contingency): a detached clone can recompute the ResponsiveContainer
+      // to 0-width and silently emit a blank PNG that does NOT reject.
+      const rect = node.getBoundingClientRect();
+      const { toPng } = await import("html-to-image"); // client-only, lazy — out of SSR + bundle
+      const dataUrl = await toPng(node, {
+        width: Math.ceil(rect.width),
+        height: Math.ceil(rect.height),
+        pixelRatio: Math.max(2, typeof window !== "undefined" ? window.devicePixelRatio || 1 : 1),
+        backgroundColor: "#ffffff", // captured root div has no bg of its own (it's on the page card)
+        cacheBust: true,
+        style: { padding: "16px", background: "#ffffff" }, // breathing room at capture time only
+        filter: (el) => !(el instanceof HTMLElement && el.dataset.htmlToImageIgnore === "true"),
+      });
+      if (!dataUrl || dataUrl.length < 5000) throw new Error("empty capture"); // blank-PNG sanity check
+      const a = document.createElement("a");
+      a.href = dataUrl;
+      a.download = "agentrank-correlation.png";
+      a.click();
+      setPngState("done");
+      scheduleReset(pngTimer, () => setPngState("idle"), 1500);
+    } catch {
+      setPngState("error");
+      scheduleReset(pngTimer, () => setPngState("idle"), 2000);
+    }
+  }, [scheduleReset]);
+
+  const handleCopy = useCallback(async () => {
+    if (typeof window === "undefined") return;
+    const url = window.location.href; // already carries the current ?focus= framing (writeFocusToUrl)
+    try {
+      if (navigator.clipboard?.writeText && window.isSecureContext) {
+        await navigator.clipboard.writeText(url);
+        setCopyState("copied");
+        scheduleReset(copyTimer, () => setCopyState("idle"), 2000);
+        return;
+      }
+      throw new Error("no clipboard");
+    } catch {
+      // Fallback for non-secure contexts / rejected permission: hidden textarea + execCommand.
+      let ok = false;
+      try {
+        const ta = document.createElement("textarea");
+        ta.value = url;
+        ta.style.position = "fixed";
+        ta.style.opacity = "0";
+        document.body.appendChild(ta);
+        ta.focus();
+        ta.select();
+        ok = document.execCommand("copy");
+        document.body.removeChild(ta);
+      } catch {
+        ok = false;
+      }
+      if (ok) {
+        setCopyState("copied");
+        scheduleReset(copyTimer, () => setCopyState("idle"), 2000);
+      } else {
+        // Total failure: surface the raw URL below and KEEP it visible (no auto-hide) so the user
+        // can actually select + copy it by hand; it clears on the next copy attempt.
+        setCopyState("error");
+      }
+    }
+  }, [scheduleReset]);
+
   // Guard the empty/partial-data case (e.g. Lane 1 hasn't run yet) so Math.min/max over an
   // empty array can't produce an Infinity axis domain and NaN stats.
   if (points.length === 0) {
@@ -285,6 +376,53 @@ export default function CorrelationChart({ points, slope, intercept, r, rho, ci,
 
   return (
     <div>
+      {/* Per-chart toolbar (move 14). These buttons are SIBLINGS above the captured node, so
+          they never appear in the exported PNG (data-html-to-image-ignore is belt-and-suspenders). */}
+      <div className="mb-3 flex items-center justify-end gap-2" data-html-to-image-ignore="true">
+        <button
+          type="button"
+          onClick={handleDownload}
+          disabled={pngState === "working"}
+          aria-label="Download the correlation chart as a PNG image"
+          className="inline-flex min-w-[120px] items-center justify-center gap-1.5 rounded-full border border-slate-200 px-2.5 py-1 text-xs text-slate-500 transition-colors hover:bg-slate-50 disabled:opacity-60"
+        >
+          {pngState === "working"
+            ? "Exporting…"
+            : pngState === "done"
+            ? "✓ Saved"
+            : pngState === "error"
+            ? "Export failed"
+            : "⬇ Download PNG"}
+        </button>
+        <button
+          type="button"
+          onClick={handleCopy}
+          aria-label="Copy a shareable link to this chart view"
+          className="inline-flex min-w-[104px] items-center justify-center gap-1.5 rounded-full border border-slate-200 px-2.5 py-1 text-xs text-slate-500 transition-colors hover:bg-slate-50"
+        >
+          {copyState === "copied" ? "✓ Copied!" : copyState === "error" ? "Copy failed" : "🔗 Copy link"}
+        </button>
+        <span role="status" aria-live="polite" className="sr-only">
+          {pngState === "working" ? "Exporting image." : ""}
+          {pngState === "done" ? "Image saved." : ""}
+          {pngState === "error" ? "Export failed; please take a screenshot instead." : ""}
+          {copyState === "copied" ? "Link copied to clipboard." : ""}
+          {copyState === "error" ? "Copy failed; the link is shown below for manual copying." : ""}
+        </span>
+      </div>
+      {/* Escape hatch when both clipboard paths fail (hardened browser): show the raw URL. */}
+      {copyState === "error" && (
+        <input
+          readOnly
+          value={typeof window !== "undefined" ? window.location.href : ""}
+          onFocus={(e) => e.currentTarget.select()}
+          aria-label="Shareable link (select to copy manually)"
+          className="mb-3 w-full rounded border border-slate-200 px-2 py-1 text-xs text-slate-500"
+        />
+      )}
+      {/* Captured node — MUST keep the r/ρ/CI/n stat-card row below so the exported PNG always
+          carries the honest anchor (plan §8). Do not move the stat cards out of this div. */}
+      <div ref={chartRef}>
       <div className="flex flex-wrap items-center gap-4 mb-4">
         <div className="bg-sky-50 border border-sky-200 rounded-lg px-4 py-3 text-center">
           <p className="text-2xl font-bold text-sky-700 tabular-nums">{r.toFixed(2)}</p>
@@ -437,6 +575,7 @@ export default function CorrelationChart({ points, slope, intercept, r, rho, ci,
           <Scatter data={points} shape={renderDot} isAnimationActive={false} />
         </ScatterChart>
       </ResponsiveContainer>
+      </div>
     </div>
   );
 }
