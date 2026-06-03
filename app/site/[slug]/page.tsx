@@ -1,42 +1,20 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getSiteDetail } from "@/lib/queries";
-import { Run } from "@/lib/types";
 import InfoLink from "@/components/InfoLink";
+import TrialAccordion from "@/components/TrialAccordion";
 
-function SubAuditRow({ label, value }: { label: string; value: number | null }) {
-  if (value === null) return null;
+// Lighthouse sub-audit ✓/✗ chip. On this page the sub-audit fields are plain 0|1 (a non-null
+// LighthouseResult), so no null branch is needed — matches the leaderboard's chip language.
+function SubAuditChip({ label, value }: { label: string; value: number }) {
   return (
-    <div className="flex items-center justify-between py-2 border-b border-slate-100 last:border-0">
-      <span className="text-sm text-slate-600">{label}</span>
-      <span className={`text-sm font-medium ${value === 1 ? "text-emerald-600" : "text-slate-400"}`}>
-        {value === 1 ? "✓ Pass" : "✗ Fail"}
-      </span>
-    </div>
-  );
-}
-
-function TrialRow({ run }: { run: Run }) {
-  const failureLabels: Record<string, string> = {
-    success: "✓ success",
-    blocked: "⛔ blocked",
-    timeout: "⏱ timeout",
-    wrong_extraction: "⚠ wrong answer",
-    navigation_stuck: "🔀 nav stuck",
-    error: "💥 error",
-  };
-  return (
-    <tr className="border-b border-slate-100 last:border-0 text-sm">
-      <td className="px-4 py-2 text-slate-500">Trial {run.trial_number}</td>
-      <td className="px-4 py-2">
-        <span className={`font-medium ${run.success ? "text-emerald-600" : "text-red-500"}`}>
-          {run.success ? "✓ Success" : "✗ Failed"}
-        </span>
-      </td>
-      <td className="px-4 py-2 text-slate-500">{failureLabels[run.failure_mode]}</td>
-      <td className="px-4 py-2 text-slate-500 tabular-nums">{run.step_count} steps</td>
-      <td className="px-4 py-2 text-slate-500 tabular-nums">{run.duration_seconds}s</td>
-    </tr>
+    <span
+      className={`text-xs rounded px-1.5 py-0.5 ${
+        value === 1 ? "bg-emerald-100 text-emerald-700" : "bg-slate-100 text-slate-400"
+      }`}
+    >
+      {value === 1 ? "✓" : "✗"} {label}
+    </span>
   );
 }
 
@@ -104,11 +82,11 @@ export default async function SiteDetailPage({ params }: { params: { slug: strin
             )}
           </h2>
           {lighthouse ? (
-            <div>
-              <SubAuditRow label="Accessibility Tree Quality" value={lighthouse.lh_accessibility_tree} />
-              <SubAuditRow label="Layout Stability" value={lighthouse.lh_layout_stability} />
-              <SubAuditRow label="llms.txt Present" value={lighthouse.lh_llms_txt} />
-              <SubAuditRow label="WebMCP Present" value={lighthouse.lh_webmcp} />
+            <div className="flex flex-wrap gap-2">
+              <SubAuditChip label="A11y Tree" value={lighthouse.lh_accessibility_tree} />
+              <SubAuditChip label="Layout Stability" value={lighthouse.lh_layout_stability} />
+              <SubAuditChip label="llms.txt" value={lighthouse.lh_llms_txt} />
+              <SubAuditChip label="WebMCP" value={lighthouse.lh_webmcp} />
             </div>
           ) : (
             <p className="text-sm text-slate-400">Run Lane 1 to populate Lighthouse scores.</p>
@@ -162,28 +140,20 @@ export default async function SiteDetailPage({ params }: { params: { slug: strin
         </p>
       </div>
 
-      {/* Trial log */}
+      {/* Trial log — each trial expands to the agent's step-by-step trajectory (move 12). */}
       {runs.length > 0 && (
         <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
-          <div className="px-5 py-4 border-b border-slate-100">
+          <div className="px-5 py-4 border-b border-slate-100 flex items-baseline justify-between gap-3">
             <h2 className="font-semibold text-slate-900">Trial log</h2>
+            <span className="text-xs text-slate-400">Click a trial to see the agent&apos;s trajectory</span>
           </div>
-          <table className="w-full">
-            <thead>
-              <tr className="bg-slate-50 border-b border-slate-100">
-                <th className="text-left px-4 py-2 text-xs font-semibold text-slate-500">Trial</th>
-                <th className="text-left px-4 py-2 text-xs font-semibold text-slate-500">Result</th>
-                <th className="text-left px-4 py-2 text-xs font-semibold text-slate-500">Failure Mode</th>
-                <th className="text-left px-4 py-2 text-xs font-semibold text-slate-500">Steps</th>
-                <th className="text-left px-4 py-2 text-xs font-semibold text-slate-500">Duration</th>
-              </tr>
-            </thead>
-            <tbody>
-              {runs.sort((a, b) => a.trial_number - b.trial_number).map((run) => (
-                <TrialRow key={run.trial_number} run={run} />
+          <div>
+            {[...runs]
+              .sort((a, b) => a.trial_number - b.trial_number)
+              .map((run) => (
+                <TrialAccordion key={run.trial_number} run={run} />
               ))}
-            </tbody>
-          </table>
+          </div>
         </div>
       )}
     </div>
